@@ -3,7 +3,7 @@
 Members:
 - Kai
 - Aryamn
-- Lucas
+- Lucas Swimming
 - Maya
 - Austin soccer 
 - Samuel Basketball 
