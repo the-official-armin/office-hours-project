@@ -6,4 +6,4 @@ Members:
 - Lucas
 - Maya
 - Austin
-- Samuel
+- Samuel Basketball 
