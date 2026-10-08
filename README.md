@@ -5,5 +5,5 @@ Members:
 - Aryamn
 - Lucas
 - Maya
-- Austin
+- Austin soccer 
 - Samuel Basketball 
