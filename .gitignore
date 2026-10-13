@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Python (in case the backend is added to this repo later)
+venv/
+__pycache__/
+
+# Logs and editor/OS files
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
