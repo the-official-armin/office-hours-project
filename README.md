@@ -7,3 +7,4 @@ Members:
 - Maya
 - Austin soccer 
 - Samuel Basketball 
+- Ryan Walking
