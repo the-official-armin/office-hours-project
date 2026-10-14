@@ -5,7 +5,7 @@ Members:
 - Aryamn
 - Lucas Swimming
 - Maya
-- Austin soccer 
+- Austin bye  
 - Samuel Basketball 
 - Ryan Walking
 
