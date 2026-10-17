@@ -1,1 +1,49 @@
+/* Shared: changes need a PR note and a teammate review.
+   Design tokens for the whole app. Reuse these utilities (bg-brand, text-ink, ...) and never hard-code hex values. */
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-sidebar: #12303a;
+  --color-sidebar-active: #234652;
+  --color-sidebar-ink: #d3e2e6;
+  --color-sidebar-muted: #8fa9b1;
+
+  --color-brand: #0f6b6b;
+  --color-brand-strong: #0b5555;
+  --color-brand-soft: #e1efee;
+  --color-brand-ink: #0b4a4a;
+
+  --color-canvas: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-ink: #16232b;
+  --color-muted: #5b6b75;
+  --color-line: #e2e7ea;
+  --color-past: #edf0f2;
+
+  --color-warn: #f2b25c;
+  --color-warn-soft: #fce9c9;
+  --color-warn-ink: #7a4a0b;
+
+  --color-danger: #a12a2a;
+  --color-danger-soft: #fbe4e4;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
