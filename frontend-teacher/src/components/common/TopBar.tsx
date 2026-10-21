@@ -3,6 +3,7 @@
 import type { Note, Role } from '../../types'
 import Icon from './Icon'
 import NotificationsPopover from './NotificationsPopover'
+import SchoolLogo from './SchoolLogo'
 
 interface Props {
   role: Role
@@ -32,10 +33,8 @@ export default function TopBar({ role, sidebarOpen, onToggleSidebar, notes, onMa
         >
           <Icon name="panel" />
         </button>
-        <div
-          className={`h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-accent text-[#12303a] max-[899px]:flex ${sidebarOpen ? 'min-[900px]:hidden' : 'min-[900px]:flex'}`}
-        >
-          <Icon name="clock" />
+        <div className={`max-[899px]:flex ${sidebarOpen ? 'min-[900px]:hidden' : 'min-[900px]:flex'}`}>
+          <SchoolLogo />
         </div>
 
         {showExample && (

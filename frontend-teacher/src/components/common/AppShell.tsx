@@ -46,7 +46,7 @@ export default function AppShell({ role, data, showExample, onMarkAllRead, onRes
       <aside
         id="side"
         inert={!open}
-        className={`hidden flex-none overflow-hidden bg-side text-white transition-[width] duration-[220ms] min-[900px]:block ${open ? 'w-[248px]' : 'w-0'}`}
+        className={`hidden flex-none overflow-hidden bg-side text-side-ink transition-[width] duration-[220ms] min-[900px]:block ${open ? 'w-[248px]' : 'w-0'}`}
       >
         <SideNav role={role} user={data.user} badges={data.badges} onLogout={onLogout} />
       </aside>

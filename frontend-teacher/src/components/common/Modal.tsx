@@ -68,7 +68,7 @@ export default function Modal({ title, subtitle, onClose, children, footer }: Mo
 
   return createPortal(
     <>
-      <div aria-hidden="true" onClick={() => onClose()} className="fixed inset-0 z-[70] bg-[rgba(10,20,26,.5)]" />
+      <div aria-hidden="true" onClick={() => onClose()} className="fixed inset-0 z-[70] bg-scrim" />
       <div
         ref={dialogRef}
         role="dialog"

@@ -108,7 +108,7 @@ export function CalendarGrid({ cal, today, onSelect, renderDay, renderMini }: Gr
                         aria-label={m.aria}
                         onClick={() => onSelect(date)}
                         className={`relative flex h-[38px] min-w-0 items-center justify-center rounded-lg border p-0 text-[13px] font-bold max-[640px]:h-10 ${MINI_STATUS[m.status]} ${
-                          date === today ? 'border-brand' : 'border-transparent'
+                          date === today ? 'border-today' : 'border-transparent'
                         } ${selected ? 'shadow-[0_0_0_2px_var(--brand)]' : ''} disabled:cursor-default`}
                       >
                         <span className="tabular-nums">{dayOfMonth(date)}</span>
@@ -168,7 +168,7 @@ export function CalendarGrid({ cal, today, onSelect, renderDay, renderMini }: Gr
               onClick={() => onSelect(date)}
               className={`flex min-w-0 flex-col items-stretch rounded-xl border p-2.5 text-left ${
                 view === 'week' ? 'min-h-[260px] gap-2 max-[640px]:min-h-0' : 'min-h-28 gap-1.5 max-[640px]:min-h-[76px] max-[640px]:gap-1 max-[640px]:rounded-[10px] max-[640px]:p-1.5'
-              } ${r.past ? 'border-line bg-past' : 'border-line bg-surface'} ${isToday ? 'border-brand' : ''} ${
+              } ${r.past ? 'border-line bg-past' : 'border-line bg-surface'} ${isToday ? 'border-today' : ''} ${
                 selected ? 'shadow-[0_0_0_2px_var(--brand)]' : ''
               } disabled:cursor-default`}
             >
@@ -183,7 +183,7 @@ export function CalendarGrid({ cal, today, onSelect, renderDay, renderMini }: Gr
                   {label}
                 </span>
                 {isToday && (
-                  <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-extrabold text-on-brand max-[640px]:px-1.5 max-[640px]:text-[10px]">
+                  <span className="rounded-full bg-badge px-2 py-0.5 text-[11px] font-extrabold text-badge-ink max-[640px]:px-1.5 max-[640px]:text-[10px]">
                     Today
                   </span>
                 )}

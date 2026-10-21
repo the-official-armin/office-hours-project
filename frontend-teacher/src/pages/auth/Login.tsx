@@ -3,7 +3,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { DEMO_ACCOUNTS } from '../../api/auth'
 import { HOME_PATH } from '../../components/common/nav'
-import Icon from '../../components/common/Icon'
+import SchoolLogo from '../../components/common/SchoolLogo'
 import { initials } from '../../lib/dates'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -16,11 +16,9 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center px-[max(16px,env(safe-area-inset-right,0px))] py-6">
       <div className="flex w-[min(520px,100%)] flex-col gap-5">
-        <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-accent text-[#12303a]">
-          <Icon name="clock" size={26} />
-        </div>
+        <SchoolLogo size={64} />
         <div>
-          <h1 className="text-[28px] font-extrabold tracking-tight">Office Hours</h1>
+          <h1 className="text-[28px] font-extrabold tracking-tight">Washington Prep Office Hours</h1>
           <p className="mt-1.5 text-[15px] text-muted">
             Book a seat with a teacher, or manage your office hours. Pick a side to look around.
           </p>

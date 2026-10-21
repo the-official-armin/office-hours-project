@@ -9,7 +9,7 @@ const VARIANTS: Record<Variant, string> = {
   default: 'border-edge bg-surface text-ink',
   primary: 'border-brand bg-brand text-on-brand',
   danger: 'border-edge bg-surface text-danger',
-  dangerfill: 'border-danger-fill bg-danger-fill text-white',
+  dangerfill: 'border-danger-fill bg-danger-fill text-on-danger',
 }
 
 const BASE =

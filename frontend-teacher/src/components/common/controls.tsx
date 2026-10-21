@@ -25,7 +25,7 @@ export function Switch({
       className={`relative h-8 w-[52px] flex-none rounded-full border-0 p-0 disabled:opacity-60 ${checked ? 'bg-brand' : 'bg-toggle-off'}`}
     >
       <i
-        className={`absolute top-1 h-6 w-6 rounded-full bg-white transition-[left] duration-[120ms] ${checked ? 'left-6' : 'left-1'}`}
+        className={`absolute top-1 h-6 w-6 rounded-full bg-knob transition-[left] duration-[120ms] ${checked ? 'left-6' : 'left-1'}`}
       />
     </button>
   )

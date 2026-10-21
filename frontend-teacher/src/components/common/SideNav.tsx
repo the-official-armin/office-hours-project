@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
 import type { Role, ShellBadges, ShellData } from '../../types'
 import { initials } from '../../lib/dates'
 import Icon from './Icon'
+import SchoolLogo from './SchoolLogo'
 import { isCurrent, isGroup, NAV_TREE, ROLE_LABEL, type NavLeaf } from './nav'
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
 }
 
 const itemBase =
-  'flex min-h-11 w-full items-center gap-3 rounded-[10px] border-0 bg-transparent px-3 text-left text-sm font-semibold text-side-ink no-underline hover:bg-white/[.08]'
+  'flex min-h-11 w-full items-center gap-3 rounded-[10px] border-0 bg-transparent px-3 text-left text-sm font-semibold text-side-ink no-underline hover:bg-side-hover'
 
 function Badge({ count }: { count: number }) {
   if (!count) return null
@@ -40,12 +41,10 @@ export default function SideNav({ role, user, badges, onLogout }: Props) {
       className="sticky top-[env(safe-area-inset-top,0px)] flex h-screen w-[248px] flex-col gap-1 overflow-auto pb-4 pl-[max(16px,env(safe-area-inset-left,0px))] pr-4 pt-6"
     >
       <div className="flex items-center gap-3 px-3 pb-6 pt-1">
-        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-accent text-[#12303a]">
-          <Icon name="clock" />
-        </div>
+        <SchoolLogo ring />
         <div>
-          <b className="block text-base font-extrabold leading-tight text-white">Office Hours</b>
-          <span className="block text-xs text-side-mute">{label}</span>
+          <b className="block text-base font-extrabold leading-tight text-side-ink-strong">Washington Prep</b>
+          <span className="block text-xs text-side-mute">Office Hours &middot; {label}</span>
         </div>
       </div>
 
@@ -57,7 +56,7 @@ export default function SideNav({ role, user, badges, onLogout }: Props) {
                 key={node.id}
                 to={node.to}
                 aria-current={current(node) ? 'page' : undefined}
-                className={`${itemBase} aria-[current=page]:bg-white/[.14] aria-[current=page]:text-white`}
+                className={`${itemBase} aria-[current=page]:bg-side-active aria-[current=page]:text-side-ink-strong`}
               >
                 <Icon name={node.icon} />
                 <span className="min-w-0 flex-1">{node.label}</span>
@@ -76,7 +75,7 @@ export default function SideNav({ role, user, badges, onLogout }: Props) {
                 aria-expanded={open}
                 aria-controls={`sub-${node.id}`}
                 onClick={() => setClosed((c) => ({ ...c, [node.id]: open }))}
-                className={`${itemBase} ${inside && !open ? 'bg-white/[.08] text-white' : ''}`}
+                className={`${itemBase} ${inside && !open ? 'bg-side-hover text-side-ink-strong' : ''}`}
               >
                 <Icon name={node.icon} />
                 <span className="min-w-0 flex-1">{node.label}</span>
@@ -88,14 +87,14 @@ export default function SideNav({ role, user, badges, onLogout }: Props) {
               <div
                 id={`sub-${node.id}`}
                 hidden={!open}
-                className="relative mb-2 mt-0.5 flex flex-col gap-0.5 pl-[22px] before:absolute before:bottom-1 before:left-[21px] before:top-1 before:w-0.5 before:rounded-sm before:bg-white/[.14] before:content-[''] [&[hidden]]:hidden"
+                className="relative mb-2 mt-0.5 flex flex-col gap-0.5 pl-[22px] before:absolute before:bottom-1 before:left-[21px] before:top-1 before:w-0.5 before:rounded-sm before:bg-side-line before:content-[''] [&[hidden]]:hidden"
               >
                 {node.kids.map((kid) => (
                   <Link
                     key={kid.id}
                     to={kid.to}
                     aria-current={current(kid) ? 'page' : undefined}
-                    className="relative flex min-h-[38px] items-center gap-3 rounded-r-[10px] py-0 pl-[22px] pr-3 text-[13.5px] font-semibold text-side-mute no-underline hover:text-white aria-[current=page]:bg-white/[.12] aria-[current=page]:text-white aria-[current=page]:before:absolute aria-[current=page]:before:-left-px aria-[current=page]:before:bottom-[7px] aria-[current=page]:before:top-[7px] aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-sm aria-[current=page]:before:bg-accent aria-[current=page]:before:content-['']"
+                    className="relative flex min-h-[38px] items-center gap-3 rounded-r-[10px] py-0 pl-[22px] pr-3 text-[13.5px] font-semibold text-side-mute no-underline hover:text-side-ink-strong aria-[current=page]:bg-side-active aria-[current=page]:text-side-ink-strong aria-[current=page]:before:absolute aria-[current=page]:before:-left-px aria-[current=page]:before:bottom-[7px] aria-[current=page]:before:top-[7px] aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-sm aria-[current=page]:before:bg-side-accent aria-[current=page]:before:content-['']"
                   >
                     <span className="min-w-0 flex-1">{kid.label}</span>
                     {kid.badge && <Badge count={badges[kid.badge]} />}
@@ -109,12 +108,12 @@ export default function SideNav({ role, user, badges, onLogout }: Props) {
 
       <div className="flex-1" />
 
-      <div className="mt-3 flex items-center gap-3 border-t border-white/[.14] px-3 pb-2 pt-4">
-        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-accent text-[13px] font-extrabold text-[#12303a]">
+      <div className="mt-3 flex items-center gap-3 border-t border-side-line px-3 pb-2 pt-4">
+        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-side-active text-[13px] font-extrabold text-side-ink-strong">
           {initials(user.name)}
         </div>
         <div className="min-w-0">
-          <b className="block truncate text-sm font-bold text-white">{user.name}</b>
+          <b className="block truncate text-sm font-bold text-side-ink-strong">{user.name}</b>
           <span className="block truncate text-xs text-side-mute">{user.subtitle}</span>
         </div>
       </div>

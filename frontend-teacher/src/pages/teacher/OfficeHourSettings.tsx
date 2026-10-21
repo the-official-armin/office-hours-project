@@ -23,8 +23,8 @@ import type { Dow, Teacher, TimingDraft } from '../../types'
 const COLORS = [
   { swatch: 'bg-brand', block: 'bg-tint text-tint-ink' },
   { swatch: 'bg-swatch-1', block: 'bg-amber text-amber-ink' },
-  { swatch: 'bg-swatch-2', block: 'bg-blue text-blue-ink' },
-  { swatch: 'bg-swatch-3', block: 'bg-violet text-violet-ink' },
+  { swatch: 'bg-swatch-2', block: 'bg-mint-soft text-mint-ink' },
+  { swatch: 'bg-swatch-3', block: 'bg-past text-past-ink' },
 ]
 
 const DAYS: Dow[] = [1, 2, 3, 4, 5]
