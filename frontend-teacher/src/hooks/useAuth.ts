@@ -5,6 +5,6 @@ import { useSyncExternalStore } from 'react'
 import { getRole, login, logout, subscribeAuth } from '../api/auth'
 
 export function useAuth() {
-  const role = useSyncExternalStore(subscribeAuth, getRole)
+  const role = useSyncExternalStore(subscribeAuth, getRole, getRole)
   return { role, isLoggedIn: role !== null, login, logout }
 }

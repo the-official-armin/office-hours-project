@@ -38,6 +38,9 @@
   --blue-ink: #1f4a8a;
   --violet: #eee7f7;
   --violet-ink: #4b2b7a;
+  --swatch-1: #d08a2e;
+  --swatch-2: #3a6fc4;
+  --swatch-3: #7a4fb8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -142,6 +145,9 @@
   --color-blue-ink: var(--blue-ink);
   --color-violet: var(--violet);
   --color-violet-ink: var(--violet-ink);
+  --color-swatch-1: var(--swatch-1);
+  --color-swatch-2: var(--swatch-2);
+  --color-swatch-3: var(--swatch-3);
   --shadow-pop: var(--shadow);
 
   /* Legacy names used by the MVP teacher pages. Remove in Phase 3 when those pages are rebuilt. */

@@ -378,3 +378,13 @@ export function affectedOn(w: World, teacherId: string, date: string, now: Date)
     return x ? !hasStarted(b.date, x.start, now) : false
   })
 }
+
+/** The first day from `from` on that is not a day off and has at least one office hour (even one already started). */
+export function firstOfficeDay(w: World, t: Teacher, from: string, now: Date): string {
+  const start = combine(from, '00:00')
+  for (let i = 0; i < 120; i++) {
+    const date = toISODate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
+    if (!isOff(t, date) && slotRows(w, t, date, now).length > 0) return date
+  }
+  return from
+}

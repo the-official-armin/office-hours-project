@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { TeacherDataProvider, toTeacherShell, useTeacher } from '../../hooks/TeacherData'
 import { useAuth } from '../../hooks/useAuth'
 import AppShell from '../common/AppShell'
-import Button from './Button'
+import Button from '../common/Button'
 
 function Shell() {
   const t = useTeacher()

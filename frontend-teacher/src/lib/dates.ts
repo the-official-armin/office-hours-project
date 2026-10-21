@@ -106,3 +106,18 @@ export function initials(name: string): string {
     .slice(0, 2)
     .toUpperCase()
 }
+
+/** Day of the month: 15 */
+export function dayOfMonth(date: string): number {
+  return parseISODate(date).getDate()
+}
+
+/** "12:10" for a time with the AM/PM dropped. */
+export function formatTimeShort(time: string): string {
+  return formatTime(time).replace(/ [AP]M$/, '')
+}
+
+/** "1 booking", "2 bookings" */
+export function plural(n: number, word: string, words = `${word}s`): string {
+  return `${n} ${n === 1 ? word : words}`
+}

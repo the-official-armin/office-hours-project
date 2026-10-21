@@ -3,8 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { teacherApi, USE_MOCKS } from '../api/teacher'
 import { resetExample, runReminders } from '../api/mocks/demo'
-import type { Booking, BookingRequest, Note, ShellData, Teacher, TeacherSettings } from '../types'
-import { pendingRequests } from '../lib/rules'
+import type { Booking, BookingRequest, DayOff, HoursInput, Note, ShellData, Teacher, TeacherSettings } from '../types'
+import { pendingRequests, type World } from '../lib/rules'
 
 export interface TeacherData {
   teacher: Teacher
@@ -14,7 +14,7 @@ export interface TeacherData {
   notes: Note[]
 }
 
-interface TeacherContextValue {
+export interface TeacherContextValue {
   status: 'loading' | 'ready' | 'error'
   error: string | null
   data: TeacherData | null
@@ -26,6 +26,11 @@ interface TeacherContextValue {
   commit: <T>(write: Promise<T>) => Promise<T>
   markNotesRead: () => Promise<void>
   resetExample: () => Promise<void>
+  saveSettings: (input: TeacherSettings) => Promise<TeacherSettings>
+  saveHours: (input: HoursInput) => Promise<{ orphaned: number }>
+  addDayOff: (input: { date: string; reason: string }) => Promise<{ dayOff: DayOff; affected: number }>
+  removeDayOff: (date: string) => Promise<void>
+  answerRequest: (id: string, answer: 'accepted' | 'declined') => Promise<BookingRequest>
 }
 
 const TeacherContext = createContext<TeacherContextValue | null>(null)
@@ -117,6 +122,11 @@ export function TeacherDataProvider({ children }: { children: ReactNode }) {
       commit,
       markNotesRead: () => commit(teacherApi.markNotesRead()),
       resetExample: () => commit(resetExample()),
+      saveSettings: (input) => commit(teacherApi.saveSettings(input)),
+      saveHours: (input) => commit(teacherApi.saveHours(input)),
+      addDayOff: (input) => commit(teacherApi.addDayOff(input)),
+      removeDayOff: (date) => commit(teacherApi.removeDayOff(date)),
+      answerRequest: (id, answer) => commit(teacherApi.answerRequest(id, answer)),
     }),
     [status, error, data, now, refresh, commit],
   )
@@ -144,4 +154,14 @@ export function toTeacherShell(data: TeacherData): ShellData {
     notes: data.notes,
     badges: { requests: pendingRequests(data.requests, data.teacher.id).length, disrupted: 0 },
   }
+}
+
+/** The teacher's own data in the shape the rules in lib/rules.ts work on. */
+export function teacherWorld(data: TeacherData): World {
+  return { teachers: [data.teacher], bookings: data.bookings }
+}
+
+/** Supplies ready-made data to a page, without loading. For tests only. */
+export function TeacherDataTestProvider({ value, children }: { value: TeacherContextValue; children: ReactNode }) {
+  return <TeacherContext.Provider value={value}>{children}</TeacherContext.Provider>
 }
