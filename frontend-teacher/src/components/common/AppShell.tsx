@@ -42,16 +42,21 @@ export default function AppShell({ role, data, showExample, onMarkAllRead, onRes
   }, [onReset, toast])
 
   return (
-    <div className="flex min-h-screen items-stretch">
+    <div className="min-h-screen">
+      {/* The panel is fixed to the viewport, so nothing inside it moves when the page scrolls. */}
       <aside
         id="side"
         inert={!open}
-        className={`hidden flex-none overflow-hidden bg-side text-side-ink transition-[width] duration-[220ms] min-[900px]:block ${open ? 'w-[248px]' : 'w-0'}`}
+        className={`fixed inset-y-0 left-0 z-[35] hidden w-[248px] bg-side text-side-ink transition-transform duration-[220ms] min-[900px]:block ${
+          open ? 'translate-x-0' : '-translate-x-full'
+        }`}
       >
         <SideNav role={role} user={data.user} badges={data.badges} onLogout={onLogout} />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div
+        className={`flex min-h-screen min-w-0 flex-col transition-[margin-left] duration-[220ms] ${open ? 'min-[900px]:ml-[248px]' : ''}`}
+      >
         <TopBar
           role={role}
           sidebarOpen={open}
