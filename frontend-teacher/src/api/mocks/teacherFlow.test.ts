@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { addDays, parseISODate, toISODate } from '../../lib/dates'
 import { RuleError } from '../errors'
-import { isLoggedIn, login, logout } from '../auth'
+import { getRole, login, logout } from '../auth'
 import { mockTeacherApi as api } from './mockTeacher'
 import { createDemoBooking, createDemoRequest, resetDemoData, runReminders } from './demo'
 import { getState } from './store'
@@ -16,10 +16,10 @@ describe('demo scenario', () => {
     const to = toISODate(addDays(parseISODate(today), 42))
 
     // 1. login
-    await expect(login('teacher@demo.school', 'wrong')).rejects.toThrow()
-    expect(isLoggedIn()).toBe(false)
-    await login('teacher@demo.school', 'demo')
-    expect(isLoggedIn()).toBe(true)
+    expect(getRole()).toBeNull()
+    expect(getRole()).toBeNull()
+    await login('teacher')
+    expect(getRole()).toBe('teacher')
 
     // 2. day off on a date that already has bookings
     const seedBookings = await api.getBookings()
@@ -61,9 +61,11 @@ describe('demo scenario', () => {
     expect(refreshed.booked).toBe(target.booked + 1)
 
     // 4. accept one request, decline another
-    const accepted = await api.acceptRequest(seedRequests[0].id)
+    // The new day off blocks requests for that date (rule 2), so accept one on another day.
+    const [toAccept, toDecline] = seedRequests.filter((r) => r.date !== bookedDate)
+    const accepted = await api.acceptRequest(toAccept.id)
     expect(accepted.slotId).toBeNull()
-    await api.declineRequest(seedRequests[1].id)
+    await api.declineRequest(toDecline.id)
     expect(await api.getRequests()).toHaveLength(1)
     expect((await api.getBookings()).some((b) => b.id === accepted.id)).toBe(true)
 
@@ -98,13 +100,13 @@ describe('demo scenario', () => {
 
     // 7. logout
     logout()
-    expect(isLoggedIn()).toBe(false)
+    expect(getRole()).toBeNull()
 
     // 8. reset
     await resetDemoData()
     expect((await api.getBookings()).length).toBe(seedBookings.length)
     expect(await api.getRequests()).toHaveLength(3)
     expect(await api.getNotifications()).toHaveLength(0)
-    expect(isLoggedIn()).toBe(false) // reset keeps the current login state
+    expect(getRole()).toBeNull() // reset keeps the current login state
   })
 })

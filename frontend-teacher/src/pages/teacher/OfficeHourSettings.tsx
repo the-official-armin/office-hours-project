@@ -123,7 +123,7 @@ export default function OfficeHourSettings() {
                           aria-pressed={on}
                           onClick={() => toggleDay(index, d)}
                           className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
-                            on ? 'border-brand bg-brand text-white' : 'border-line bg-surface hover:bg-canvas'
+                            on ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface hover:bg-canvas'
                           }`}
                         >
                           {WEEKDAY_LABELS[d]}

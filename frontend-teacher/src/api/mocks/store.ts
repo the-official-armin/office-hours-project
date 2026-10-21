@@ -79,7 +79,8 @@ export function mutate<T>(fn: (draft: DemoState) => T): T {
 
 /** Restore the seed. Keeps the current login so the demo does not log you out. */
 export function resetState(): void {
-  commit(seedState(new Date(), getState().loggedIn))
+  const { loggedIn, role } = getState()
+  commit({ ...seedState(new Date(), loggedIn), role })
 }
 
 export function nextId(draft: DemoState, prefix: string): string {

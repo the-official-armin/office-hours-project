@@ -1,33 +1,158 @@
 /* Shared: changes need a PR note and a teammate review.
-   Design tokens for the whole app. Reuse these utilities (bg-brand, text-ink, ...) and never hard-code hex values. */
+   Design tokens for the whole app, copied from design/reference. Reuse the utilities (bg-brand, text-ink,
+   border-line, ...) and never hard-code hex values. Dark theme follows prefers-color-scheme, or [data-theme]. */
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+:root {
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --soft: #f4f6f8;
+  --line: #e1e6ea;
+  --edge: #c9d2d9;
+  --field: #ffffff;
+  --ink: #16202a;
+  --ink2: #34414c;
+  --muted: #55616c;
+  --brand: #0f6b6b;
+  --on-brand: #ffffff;
+  --link: #0f6b6b;
+  --tint: #e3f1f0;
+  --tint-ink: #0b4f4f;
+  --side: #12303a;
+  --side-ink: #d5e3e6;
+  --side-mute: #a9c2c8;
+  --accent: #3fb6a8;
+  --amber: #fbebd3;
+  --amber-ink: #7a4a0b;
+  --past: #eef1f4;
+  --past-ink: #5f6c77;
+  --danger: #9b2c2c;
+  --danger-fill: #9b2c2c;
+  --badge: #f2b766;
+  --badge-ink: #3b2606;
+  --seat-edge: #7a8995;
+  --toggle-off: #7a8995;
+  --shadow: 0 12px 32px rgba(18, 48, 58, 0.18);
+  --blue: #e4ecf8;
+  --blue-ink: #1f4a8a;
+  --violet: #eee7f7;
+  --violet-ink: #4b2b7a;
+}
 
-  --color-sidebar: #12303a;
-  --color-sidebar-active: #234652;
-  --color-sidebar-ink: #d3e2e6;
-  --color-sidebar-muted: #8fa9b1;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0d1418;
+    --surface: #151f25;
+    --soft: #1b2830;
+    --line: #26343c;
+    --edge: #3b4c56;
+    --field: #101a20;
+    --ink: #e8eef1;
+    --ink2: #c3cfd6;
+    --muted: #95a6b0;
+    --brand: #2fa79b;
+    --on-brand: #04201e;
+    --link: #5ccdbf;
+    --tint: #17383a;
+    --tint-ink: #8fe0d5;
+    --side: #102a32;
+    --amber: #3a2a12;
+    --amber-ink: #f2c98a;
+    --past: #1b262d;
+    --past-ink: #8d9da7;
+    --danger: #f28b8b;
+    --danger-fill: #b23a3a;
+    --seat-edge: #6f8390;
+    --toggle-off: #5e717d;
+    --blue: #1a2a44;
+    --blue-ink: #a9c6f2;
+    --violet: #2a2140;
+    --violet-ink: #cdb8f0;
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
 
-  --color-brand: #0f6b6b;
-  --color-brand-strong: #0b5555;
-  --color-brand-soft: #e1efee;
-  --color-brand-ink: #0b4a4a;
+:root[data-theme='dark'] {
+  --bg: #0d1418;
+  --surface: #151f25;
+  --soft: #1b2830;
+  --line: #26343c;
+  --edge: #3b4c56;
+  --field: #101a20;
+  --ink: #e8eef1;
+  --ink2: #c3cfd6;
+  --muted: #95a6b0;
+  --brand: #2fa79b;
+  --on-brand: #04201e;
+  --link: #5ccdbf;
+  --tint: #17383a;
+  --tint-ink: #8fe0d5;
+  --side: #102a32;
+  --amber: #3a2a12;
+  --amber-ink: #f2c98a;
+  --past: #1b262d;
+  --past-ink: #8d9da7;
+  --danger: #f28b8b;
+  --danger-fill: #b23a3a;
+  --seat-edge: #6f8390;
+  --toggle-off: #5e717d;
+  --blue: #1a2a44;
+  --blue-ink: #a9c6f2;
+  --violet: #2a2140;
+  --violet-ink: #cdb8f0;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
 
-  --color-canvas: #f4f6f8;
-  --color-surface: #ffffff;
-  --color-ink: #16232b;
-  --color-muted: #5b6b75;
-  --color-line: #e2e7ea;
-  --color-past: #edf0f2;
+/* Tailwind utilities read the variables above, so a theme switch needs no rebuild. */
+@theme inline {
+  --font-sans: var(--font);
 
-  --color-warn: #f2b25c;
-  --color-warn-soft: #fce9c9;
-  --color-warn-ink: #7a4a0b;
+  --color-page: var(--bg);
+  --color-surface: var(--surface);
+  --color-soft: var(--soft);
+  --color-line: var(--line);
+  --color-edge: var(--edge);
+  --color-field: var(--field);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink2);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-on-brand: var(--on-brand);
+  --color-link: var(--link);
+  --color-tint: var(--tint);
+  --color-tint-ink: var(--tint-ink);
+  --color-side: var(--side);
+  --color-side-ink: var(--side-ink);
+  --color-side-mute: var(--side-mute);
+  --color-accent: var(--accent);
+  --color-amber: var(--amber);
+  --color-amber-ink: var(--amber-ink);
+  --color-past: var(--past);
+  --color-past-ink: var(--past-ink);
+  --color-danger: var(--danger);
+  --color-danger-fill: var(--danger-fill);
+  --color-badge: var(--badge);
+  --color-badge-ink: var(--badge-ink);
+  --color-seat-edge: var(--seat-edge);
+  --color-toggle-off: var(--toggle-off);
+  --color-blue: var(--blue);
+  --color-blue-ink: var(--blue-ink);
+  --color-violet: var(--violet);
+  --color-violet-ink: var(--violet-ink);
+  --shadow-pop: var(--shadow);
 
-  --color-danger: #a12a2a;
-  --color-danger-soft: #fbe4e4;
+  /* Legacy names used by the MVP teacher pages. Remove in Phase 3 when those pages are rebuilt. */
+  --color-canvas: var(--bg);
+  --color-brand-soft: var(--tint);
+  --color-brand-ink: var(--tint-ink);
+  --color-brand-strong: color-mix(in srgb, var(--brand) 85%, black);
+  --color-warn: var(--badge);
+  --color-warn-soft: var(--amber);
+  --color-warn-ink: var(--amber-ink);
+  --color-danger-soft: color-mix(in srgb, var(--danger) 14%, var(--surface));
 }
 
 html,
@@ -38,12 +163,43 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Keeps content clear of the phone status bar when the page is edge to edge. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 40;
+  background: var(--surface);
+}
+
+button {
+  cursor: pointer;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
+}
+
+[data-side] :focus-visible {
+  outline-color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
 }

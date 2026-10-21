@@ -1,5 +1,14 @@
 // Owner: Subgroup B (Teacher desktop UI). Seed data for the local demo, generated relative to "now".
-import type { AppNotification, Booking, BookingRequest, DayOff, ReminderPrefs, Schedule, TeacherProfile } from '../../types'
+import type {
+  AppNotification,
+  Booking,
+  BookingRequest,
+  DayOff,
+  ReminderPrefs,
+  Role,
+  Schedule,
+  TeacherProfile,
+} from '../../types'
 import { addDays, parseISODate, toISODate, weekdayOf } from '../../lib/dates'
 import { slotId } from './bookingRules'
 
@@ -8,6 +17,8 @@ export const STORAGE_VERSION = 1
 export interface DemoState {
   version: number
   loggedIn: boolean
+  /** Who is signed in. Missing in data saved before roles existed (treated as teacher). */
+  role?: Role
   profile: TeacherProfile
   prefs: ReminderPrefs
   schedule: Schedule

@@ -121,3 +121,33 @@ export type RuleCode =
   | 'no_office_hour'
   | 'duplicate_day_off'
   | 'invalid'
+
+export type Role = 'student' | 'teacher'
+
+/** What the app shell (sidebar, top bar, tab bar) needs to know about the signed-in person. */
+export interface ShellUser {
+  name: string
+  /** Subject for teachers, grade for students. */
+  subtitle: string
+}
+
+export interface ShellNote {
+  id: string
+  text: string
+  /** Epoch milliseconds. */
+  at: number
+  read: boolean
+}
+
+export interface ShellBadges {
+  /** Teacher: open booking requests. */
+  requests: number
+  /** Student: upcoming bookings flagged as disrupted. */
+  disrupted: number
+}
+
+export interface ShellData {
+  user: ShellUser
+  notes: ShellNote[]
+  badges: ShellBadges
+}

@@ -112,7 +112,7 @@ export default function TeacherSettings() {
                     aria-pressed={prefs.leadMinutes === l.minutes}
                     onClick={() => setPrefs({ ...prefs, leadMinutes: l.minutes })}
                     className={`rounded-lg border px-4 py-2 text-sm font-bold ${
-                      prefs.leadMinutes === l.minutes ? 'border-brand bg-brand text-white' : 'border-line bg-surface hover:bg-canvas'
+                      prefs.leadMinutes === l.minutes ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface hover:bg-canvas'
                     }`}
                   >
                     {l.label}

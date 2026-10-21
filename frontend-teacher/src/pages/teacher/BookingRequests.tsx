@@ -1,5 +1,5 @@
 // Owner: Subgroup B (Teacher desktop UI). Purpose: requests (accept/decline) and upcoming bookings with each reason summary.
-import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Button from '../../components/teacher/Button'
 import { Avatar, Badge, Card, EmptyState, FeedbackMessage, PageHeader } from '../../components/teacher/ui'
 import { useTeacherData } from '../../hooks/TeacherDataProvider'
@@ -11,14 +11,17 @@ type Tab = 'requests' | 'bookings'
 export default function BookingRequests() {
   const { data, now, acceptRequest, declineRequest } = useTeacherData()
   const { run, feedback, pending, isPending } = useAsyncAction()
-  const [tab, setTab] = useState<Tab>('requests')
+  // The tab lives in the URL so the sidebar can link to ?tab=bookings.
+  const [params, setParams] = useSearchParams()
+  const tab: Tab = params.get('tab') === 'bookings' ? 'bookings' : 'requests'
+  const setTab = (next: Tab) => setParams({ tab: next })
 
   const requests = data.requests
   const bookings = data.bookings.filter((b) => combine(b.date, b.start) > now)
 
   const tabClass = (active: boolean) =>
     `rounded-lg border px-4 py-2 text-sm font-bold ${
-      active ? 'border-brand bg-brand text-white' : 'border-line bg-surface hover:bg-canvas'
+      active ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface hover:bg-canvas'
     }`
 
   return (

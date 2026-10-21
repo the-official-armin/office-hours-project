@@ -1,69 +1,53 @@
-// PLACEHOLDER login for the local demo. The auth team owns real login (FastAPI + JWT); replace this page and
-// src/hooks/useAuth.ts then. Pages should not need to change.
-import { useState, type FormEvent } from 'react'
+// PLACEHOLDER sign-in for the local demo, same as the design reference: pick a side and you are signed in as the
+// example person. The auth team owns real login (FastAPI + JWT); replace this page and src/hooks/useAuth.ts then.
 import { Navigate, useNavigate } from 'react-router-dom'
-import { DEMO_EMAIL, DEMO_PASSWORD } from '../../api/auth'
-import Button from '../../components/teacher/Button'
-import FormInput from '../../components/teacher/FormInput'
-import { Notice } from '../../components/teacher/ui'
+import { DEMO_ACCOUNTS } from '../../api/auth'
+import { HOME_PATH } from '../../components/common/nav'
+import Icon from '../../components/common/Icon'
+import { initials } from '../../lib/dates'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function Login() {
-  const { isLoggedIn, login } = useAuth()
+  const { role, login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState(DEMO_EMAIL)
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
 
-  if (isLoggedIn) return <Navigate to="/teacher" replace />
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      await login(email, password)
-      navigate('/teacher', { replace: true })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not log in.')
-    } finally {
-      setBusy(false)
-    }
-  }
+  if (role) return <Navigate to={HOME_PATH[role]} replace />
 
   return (
-    <div className="flex min-h-screen min-w-[1024px] items-center justify-center bg-canvas">
-      <div className="w-[420px] rounded-2xl border border-line bg-surface p-8">
-        <h1 className="text-2xl font-extrabold">Office Hours</h1>
-        <p className="mb-5 text-muted">Teacher login</p>
-
-        <Notice tone="warn">
-          <p className="font-bold">Placeholder login for the local demo.</p>
-          <p>
-            Email: <code>{DEMO_EMAIL}</code>
-            <br />
-            Password: <code>{DEMO_PASSWORD}</code>
+    <div className="flex min-h-screen items-center justify-center px-[max(16px,env(safe-area-inset-right,0px))] py-6">
+      <div className="flex w-[min(520px,100%)] flex-col gap-5">
+        <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-accent text-[#12303a]">
+          <Icon name="clock" size={26} />
+        </div>
+        <div>
+          <h1 className="text-[28px] font-extrabold tracking-tight">Office Hours</h1>
+          <p className="mt-1.5 text-[15px] text-muted">
+            Book a seat with a teacher, or manage your office hours. Pick a side to look around.
           </p>
-          <p className="mt-1">Real login is owned by the auth team.</p>
-        </Notice>
+        </div>
 
-        <form onSubmit={onSubmit} className="mt-5 space-y-4">
-          <FormInput label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <FormInput
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <div aria-live="polite" role="status">
-            {error && <p className="rounded-lg bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">{error}</p>}
-          </div>
-          <Button type="submit" loading={busy} className="w-full">
-            Log in
-          </Button>
-        </form>
+        {DEMO_ACCOUNTS.map((a) => (
+          <button
+            key={a.role}
+            type="button"
+            onClick={() => void login(a.role).then(() => navigate(HOME_PATH[a.role], { replace: true }))}
+            className="flex min-h-[72px] w-full items-center gap-3.5 rounded-[14px] border border-edge bg-surface p-4 text-left hover:border-brand"
+          >
+            <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-tint font-extrabold text-tint-ink">
+              {initials(a.name)}
+            </span>
+            <span>
+              <b className="block text-base font-extrabold capitalize">{a.role}</b>
+              <small className="mt-0.5 block text-[13px] text-muted">
+                {a.name}, {a.detail}
+              </small>
+            </span>
+          </button>
+        ))}
+
+        <p className="text-[13px] text-muted">
+          Example data saved in this browser. Real sign-in will come from the auth team.
+        </p>
       </div>
     </div>
   )
