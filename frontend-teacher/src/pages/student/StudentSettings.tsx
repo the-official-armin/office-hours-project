@@ -6,6 +6,7 @@ import Button from '../../components/common/Button'
 import Card, { CardTitle } from '../../components/common/Card'
 import { ErrorText, Field, SelectInput, TextInput } from '../../components/common/fields'
 import PageHeader from '../../components/common/PageHeader'
+import AppearanceCard from '../../components/common/AppearanceCard'
 import { EmailReminders, MailPreview } from '../../components/common/SettingsParts'
 import { useToast } from '../../components/common/Toast'
 import { myWorld, useStudentData } from '../../hooks/StudentData'
@@ -81,6 +82,8 @@ export default function StudentSettings() {
             onToggle={(key, v) => setPref({ [key]: v })}
             onLead={(lead) => setPref({ lead })}
           />
+
+          <AppearanceCard />
         </div>
 
         <div className="flex flex-[2_1_320px] flex-col gap-6">
