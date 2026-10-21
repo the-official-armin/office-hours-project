@@ -1,67 +1,74 @@
-# Teacher desktop UI (local MVP)
+# Washington Prep Office Hours (frontend)
 
-React + TypeScript + Tailwind + Vite + React Router. Desktop only (min width 1024px).
-This app runs entirely in the browser on local demo data. There is no backend, no real email and no deployment.
+React + TypeScript + Tailwind v4 + Vite + React Router. Teacher and Student sides, responsive (desktop sidebar, phone tab bar).
+It runs entirely in the browser on example data: no backend, no real email, nothing deployed.
 
 ## Run it (Windows PowerShell)
 
 ```powershell
 cd frontend-teacher
 npm install
-Copy-Item .env.example .env.local   # optional: the defaults already use the demo data
-npm run dev
+npm run dev          # add  -- --open  to open the browser
 ```
 
-Open http://localhost:5173 and log in with the demo account:
+Open the URL Vite prints (usually http://localhost:5173) and pick **Teacher** (Ms. Rivera) or **Student** (Maya K.).
+Whatever one side does shows up on the other: a seat Maya books appears for Ms. Rivera, and her answers reach Maya.
 
-- Email: `teacher@demo.school`
-- Password: `demo`
-
-Other commands: `npm run build` (type-check + build), `npm run test` (booking rule tests), `npm run lint`.
-
-## What you can do
-
-- **Dashboard**: seats booked this week, next office hour, open requests (Accept / Decline).
-- **Calendar**: any month, click a day to see its office hours and students, mark a day off.
-- **Office hours**: two timings, their days, seats per office hour. Existing bookings are never deleted.
-- **Days off**: add and remove; a confirmation shows how many bookings a day off affects.
-- **Booking requests**: accept or decline requests, and see upcoming bookings with each reason.
-- **Settings**: profile and which (simulated) email reminders you get.
-- **Demo tools** (sidebar, "Demo"): act as a student to book seats and send requests, cancel bookings, reset data.
-  The Student UI belongs to another team, so this page stands in for it. It is easy to remove later.
-
-Data is stored in your browser's localStorage under `officehours.demo.v1`. Use **Demo tools > Reset demo data**
-to start over.
-
-## What is simulated
-
-| Real thing | In this MVP |
+| Command | What it does |
 | --- | --- |
-| Backend and database | `src/api/mocks/store.ts` (localStorage, seeded relative to today's date) |
-| Booking rules (no past, no day off, max students) | `src/api/mocks/bookingRules.ts`, with unit tests. The real backend must enforce these. |
-| Email reminders | Notifications in the bell panel. Nothing is ever sent. |
-| Login (JWT) | A placeholder flag in the store. The auth team owns the real login. |
-| Latency | A 150-300 ms delay on every mock call, so loading states are real. |
+| `npm run build` | Type-check and build |
+| `npx vitest run` | Unit and render tests (rules, calendar, themes, contrast, every page) |
+| `npm run e2e` | Playwright tests in a real browser (sidebar stays fixed). First time: `npx playwright install chromium` |
+| `npm run lint` | oxlint |
 
-## How data flows
+To check the app on any day, run the tests with a fixed date: `$env:VITE_TEST_NOW="2026-10-17T10:00:00"; npx vitest run`.
 
-`pages -> useTeacher() (hooks/TeacherDataProvider.tsx) -> api/teacher.ts -> mocks or real backend`.
-Pages never call `fetch` or touch localStorage.
+## Routes
+
+- Teacher: `/teacher` (Dashboard), `/teacher/calendar`, `/teacher/office-hours`, `/teacher/days-off`,
+  `/teacher/requests?tab=requests|bookings`, `/teacher/settings`
+- Student: `/student` (Home), `/student/teachers`, `/student/teachers/:teacherId?day=YYYY-MM-DD`,
+  `/student/bookings?tab=up|past|req`, `/student/settings`
+- `/login` is a placeholder sign-in (pick a side). Real login belongs to the auth team.
+
+## Themes
+
+Settings -> Appearance has three color themes and Light / Dark / System. They apply immediately and are remembered
+(`oh-palette`, `oh-theme` in localStorage).
+
+| Theme | Look |
+| --- | --- |
+| Washington Navy (default) | Deep navy sidebar |
+| Shield Mint | Navy sidebar, mint accent, green buttons |
+| Crest Light | Light sidebar with navy text |
+
+The only colors are the school crest's navy, torch orange and shield mint, plus white and neutral greys.
+Orange is an accent only (active-nav bar, count badges, today's ring) and text on it is navy.
+Status colors never change with the theme: open seats use the theme tint, full / day off use a pale orange tint, past is grey.
+All colors are CSS variables in `src/index.css`; never hard-code a hex value. `src/lib/contrast.test.ts` checks every
+text/background pair in all six combinations (3 themes x light/dark).
+
+Put the crest at `public/school-logo.png` (square PNG, 256x256 or more). Until it exists a navy "WP" badge is shown.
+
+## How the data flows
+
+`pages -> useTeacher() / useStudent() -> src/api/teacher.ts | student.ts -> mock store or real backend`
+
+- The domain rules (no past or started office hours, no booking on a day off, seats, one seat per office hour, no
+  overlaps, schedule changes keep bookings) are pure functions in `src/lib/rules.ts`. The mock store enforces them;
+  the real backend must enforce the same ones. The UI only shows and pre-validates them.
+- `VITE_USE_MOCKS=true` (default) answers from a store in localStorage (`officehours.demo.v2`) seeded from today's date.
+  The Example data / Reset chip in the top bar restores the original data.
+- Reminders and notifications are simulated in the app. Nothing is emailed.
 
 ## Switch to the real backend later
 
-1. Copy `.env.example` to `.env.local` and set:
-   ```
-   VITE_USE_MOCKS=false
-   VITE_API_URL=http://localhost:8000
-   ```
-2. Make the backend match [docs/api-contract.md](../docs/api-contract.md). `src/api/teacher.ts` already calls those endpoints.
-3. Replace the placeholder login: `src/api/auth.ts`, `src/hooks/useAuth.ts` and `src/pages/auth/Login.tsx` belong to the auth team.
-4. Delete the Demo tools page, its route in `src/routes/AppRoutes.tsx`, and its sidebar link in `TeacherLayout.tsx`.
+1. Copy `.env.example` to `.env.local`: `VITE_USE_MOCKS=false` and `VITE_API_URL=http://localhost:8000`.
+2. Make the backend match `docs/api-contract.md` (the endpoints `src/api/teacher.ts` and `student.ts` call).
+3. Replace the placeholder login: `src/api/auth.ts`, `src/hooks/useAuth.ts`, `src/pages/auth/Login.tsx`.
 
 ## Ownership
 
-Ours (Subgroup B): `pages/teacher/`, `components/teacher/`, `api/teacher.ts`, `api/mocks/`.
-Shared (PR note and teammate review): `components/common/`, `api/client.ts`, `api/auth.ts`, `hooks/useAuth.ts`,
-`types/`, `lib/`, `routes/`, `src/index.css`, `docs/api-contract.md`.
-Other teams: `pages/student/`, `pages/admin/`, and the real login.
+Everything in `frontend-teacher/` is built by Subgroup B. Shared files need a PR note and a teammate review:
+`src/components/common/`, `src/api/client.ts`, `src/api/auth.ts`, `src/hooks/useAuth.ts`, `src/types/`, `src/lib/`,
+`src/routes/`, `src/index.css`, `docs/api-contract.md`.

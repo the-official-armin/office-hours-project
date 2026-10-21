@@ -1,90 +1,56 @@
-# CLAUDE.md
+# CLAUDE.md (frontend-teacher)
 
-## Overview
-Office Hours Booking System: students book office-hour slots with teachers on a calendar (like
-theater seat selection), give a short reason, and get email reminders. Roles: Student, Teacher, Admin.
-**We are frontend only.** Our subgroup (Lucas, Austin, Ryan) builds the Teacher desktop UI. Another
-team owns the backend. Do not write backend code.
+Washington Prep Office Hours: students book office-hour seats with teachers; teachers set their schedule, days off and
+answer requests. Frontend only. A separate team owns the FastAPI backend. Do not write backend code here.
 
-## Tech stack
-React + TypeScript (Vite, strict mode), Tailwind CSS, React Router. Git + GitHub, deploy on Vercel.
-Backend (not ours): Python + FastAPI + PostgreSQL + SQLAlchemy + JWT.
+## Stack
+React + TypeScript (strict), Tailwind v4, React Router, Vite, Vitest, Playwright. No other UI libraries.
 
-## Repo layout
+## Commands (run in `frontend-teacher/`)
+- `npm install`, `npm run dev`
+- `npm run build` (type-checks too), `npx vitest run`, `npm run e2e`, `npm run lint`
+
+## Layout
 ```
-CLAUDE.md  README.md  .gitignore
-.github/pull_request_template.md
-docs/            git-workflow.md, api-contract.md
-frontend/
-  .env.example   VITE_API_URL, VITE_USE_MOCKS=true
-  src/
-    pages/       teacher/ (OURS), student/ admin/ auth/ (other teams, stubs)
-    components/  teacher/ (OURS), common/ (shared)
-    api/         client.ts (shared), teacher.ts, mocks/teacher.ts (OURS)
-    hooks/  types/ (shared)  routes/ (shared)
+src/
+  pages/teacher|student|auth/   screens
+  components/common/            shared UI: AppShell, SideNav, Calendar, Modal, Button, Card, fields, themes card
+  components/teacher|student/   role-specific pieces and layouts
+  hooks/                        TeacherData / StudentData providers, useAuth, useAction, useSidebar
+  api/                          client.ts, teacher.ts, student.ts, auth.ts, mocks/ (store, seed, actions)
+  lib/                          rules.ts (domain rules), calendar.ts, dates.ts, text.ts, theme.ts
+  types/index.ts                the one source of types
+e2e/                            Playwright tests
 ```
 
-## Commands (run in `frontend/`)
-- Install: `npm install`
-- Dev server: `npm run dev`
-- Build: `npm run build` (also type-checks)
-- Type-check only: `npx tsc -b`
-- Lint: `npm run lint`
+## Rules for code
+- Functional components, Tailwind only. No custom CSS beyond `src/index.css`.
+- **Colors come from CSS variables in `src/index.css` only.** No hex values, no `white/NN` overlays, no `text-white`.
+  Only the school colors (navy, torch orange, shield mint) plus white and neutral greys. Orange is accent-only and text
+  on it is navy. Status colors (open = theme tint, full / day off = pale orange, past = grey) never change per theme.
+  `src/lib/contrast.test.ts` must pass for any color change.
+- All data goes through `src/api/`. Pages never call `fetch` or touch localStorage. Mock mode must keep working.
+- Booking rules live in `src/lib/rules.ts` as pure functions with tests. The UI only shows and pre-validates them;
+  the backend is the source of truth.
+- The sidebar is a fixed panel (brand header and footer never scroll; only the nav does). Keep `e2e/sidebar.spec.ts` green.
+- Every new endpoint goes into `docs/api-contract.md`.
 
-## Our subgroup: Teacher desktop UI (Lucas, Austin, Ryan)
-Owned: `pages/teacher/`, `components/teacher/`, `api/teacher.ts`, `api/mocks/teacher.ts`.
+## Shared files (need a PR note and a teammate review)
+`src/components/common/`, `src/api/client.ts`, `src/api/auth.ts`, `src/hooks/useAuth.ts`, `src/types/`, `src/lib/`,
+`src/routes/`, `src/index.css`, `docs/api-contract.md`.
 
-| Page | Purpose |
-| --- | --- |
-| TeacherDashboard | Upcoming office hours and booked students |
-| OfficeHourSettings | Two timing options and max students per slot (with default) |
-| TeacherCalendar | Availability and bookings on a calendar |
-| DaysOff | Mark and remove days off |
-| BookingRequests | Student bookings with each reason summary |
-| TeacherSettings | Profile and email reminder preferences |
-
-`components/teacher/TeacherLayout.tsx` provides the sidebar, header, and logout button.
-Desktop only (min width 1024px): sidebar + main layout, no mobile/tablet breakpoints.
-
-## Other subgroups (do not edit their folders)
-- A: Sammy, Wan Ho, Humay
-- C: Davis, Eshi, Maya, Kenzo
-- D: Kai, Eric, Cyber
-
-Student, admin and auth pages are other teams' stubs (`// Owner: other team, do not edit without coordinating`).
-
-**Shared areas** (`components/common/`, `api/client.ts`, `types/`, `routes/`, `docs/api-contract.md`):
-any change needs a PR note and a teammate review.
-
-## Conventions
-- Functional components, Tailwind only (no custom CSS unless needed).
-- All backend calls go through `src/api/`. Components never call `fetch` directly.
-- Types live in `src/types/` and mirror `docs/api-contract.md`.
-- `VITE_USE_MOCKS` defaults to true so we never wait on the backend.
-- Booking rules (no past bookings, no bookings on days off, max students per slot) are shown and
-  pre-validated in the UI only. The backend is the source of truth.
-
-## Git workflow
-- Never commit to `main`. Branch names: `feature/teacher-<short-name>`.
-- Small PRs. Pull before pushing. One teammate reviews each PR.
-- Beginner guide: `docs/git-workflow.md`.
+## Git
+Never commit to `main`. Branch names `feature/<area>-<short-name>`. Small PRs, pull before pushing, one teammate reviews.
 
 ## Do not
-- Change the tech stack.
-- Add dependencies without noting it in the PR.
-- Commit `.env` files or secrets.
-- Edit other teams' folders.
-- Build mobile layouts for Teacher pages.
-- Build the Alma integration (stretch goal, docs only).
-- Write backend code.
+Change the stack, add dependencies without saying so in the PR, commit `.env` files, edit another team's folders (backend,
+real login), build the Alma integration, or write backend code.
 
-## Current status
-- [ ] TeacherDashboard
-- [ ] OfficeHourSettings
-- [ ] TeacherCalendar
-- [ ] DaysOff
-- [ ] BookingRequests
-- [ ] TeacherSettings
-- [ ] Login/logout wiring
-- [ ] Calendar view
-- [ ] Mock-to-real API switch
+## Status
+- [x] Teacher: Dashboard, Calendar, Office hours, Days off, Booking requests, Settings
+- [x] Student: Home, Find a teacher, Book a seat, My bookings, Settings
+- [x] Themes (3 palettes, light / dark / system), fixed sidebar
+- [ ] Put the school crest at `public/school-logo.png`
+- [ ] Update `docs/api-contract.md` to the current endpoints
+- [ ] Switch from mocks to the real API
+- [ ] Real login wired to the auth team's JWT
