@@ -1,6 +1,6 @@
 // Shared: changes need a PR note and a teammate review.
 // PLACEHOLDER: the auth team owns real login (FastAPI + JWT). This version works like the design reference:
-// you pick a role and are signed in as the example person. It only flips a flag in the local store.
+// you pick a role and are signed in as the example person. It only stores the role in the local mock store.
 // Keep the exported function names so useAuth() can be re-pointed at real JWT without touching pages.
 import type { Role } from '../types'
 import { getState, mutate, subscribe } from './mocks/store'
@@ -19,8 +19,7 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
 
 /** The signed-in role, or null. A primitive, so it is safe for useSyncExternalStore. */
 export function getRole(): Role | null {
-  const s = getState()
-  return s.loggedIn ? (s.role ?? 'teacher') : null
+  return getState().session
 }
 
 export function subscribeAuth(listener: () => void): () => void {
@@ -29,13 +28,12 @@ export function subscribeAuth(listener: () => void): () => void {
 
 export async function login(role: Role): Promise<void> {
   mutate((d) => {
-    d.loggedIn = true
-    d.role = role
+    d.session = role
   })
 }
 
 export function logout(): void {
   mutate((d) => {
-    d.loggedIn = false
+    d.session = null
   })
 }

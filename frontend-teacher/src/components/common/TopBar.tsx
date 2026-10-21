@@ -1,6 +1,6 @@
 // Shared: changes need a PR note and a teammate review.
 // Purpose: sticky top bar: sidebar toggle, logo (when the sidebar is hidden), example-data chip, bell, reset.
-import type { Role, ShellNote } from '../../types'
+import type { Note, Role } from '../../types'
 import Icon from './Icon'
 import NotificationsPopover from './NotificationsPopover'
 
@@ -8,7 +8,7 @@ interface Props {
   role: Role
   sidebarOpen: boolean
   onToggleSidebar: () => void
-  notes: ShellNote[]
+  notes: Note[]
   onMarkAllRead: () => void
   /** Show the "Example data" chip and reset button. Only true when running on mock data. */
   showExample: boolean

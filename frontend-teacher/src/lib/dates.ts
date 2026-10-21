@@ -1,18 +1,23 @@
 // Shared: changes need a PR note and a teammate review.
 // Purpose: pure date/time helpers (local time, "YYYY-MM-DD" and "HH:MM" strings). No React.
-import type { Weekday } from '../types'
 
-const WEEKDAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri']
-
-export const WEEKDAY_LABELS: Record<Weekday, string> = {
-  mon: 'Mon',
-  tue: 'Tue',
-  wed: 'Wed',
-  thu: 'Thu',
-  fri: 'Fri',
-}
-
-export const WEEKDAY_ORDER = WEEKDAYS
+export const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+export const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTH_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -30,22 +35,22 @@ export function isValidISODate(s: string): boolean {
   return toISODate(parseISODate(s)) === s
 }
 
+export function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
 export function addDays(d: Date, n: number): Date {
-  const next = new Date(d)
-  next.setDate(next.getDate() + n)
-  return next
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
 }
 
 /** Monday of the week that contains `d`. */
 export function startOfWeek(d: Date): Date {
-  const day = (d.getDay() + 6) % 7
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day)
+  return addDays(d, -((d.getDay() + 6) % 7))
 }
 
-/** "mon".."fri", or null on weekends. */
-export function weekdayOf(date: string): Weekday | null {
-  const idx = (parseISODate(date).getDay() + 6) % 7
-  return idx < 5 ? WEEKDAYS[idx] : null
+/** JavaScript weekday of a date key: 0 = Sunday ... 6 = Saturday. */
+export function dowOf(date: string): number {
+  return parseISODate(date).getDay()
 }
 
 /** Date + "HH:MM" as a local Date. */
@@ -56,43 +61,48 @@ export function combine(date: string, time: string): Date {
   return d
 }
 
+/** "12:10 PM" */
 export function formatTime(time: string): string {
   const [h, m] = time.split(':').map(Number)
-  const suffix = h >= 12 ? 'PM' : 'AM'
-  const hour = h % 12 === 0 ? 12 : h % 12
-  return `${hour}:${pad(m)} ${suffix}`
+  return `${h % 12 || 12}:${pad(m)} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
-export function formatTimeRange(start: string, end: string): string {
-  return `${formatTime(start)} – ${formatTime(end)}`
+/** "12:10 – 12:40 PM" (drops the first AM/PM when both match). */
+export function formatRange(start: string, end: string): string {
+  const a = formatTime(start)
+  const b = formatTime(end)
+  return `${a.slice(-2) === b.slice(-2) ? a.replace(/ [AP]M$/, '') : a} – ${b}`
 }
 
+/** "Thursday, October 15" */
 export function formatDateLong(date: string): string {
-  return parseISODate(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const d = parseISODate(date)
+  return `${DOW_LONG[d.getDay()]}, ${MONTH_LONG[d.getMonth()]} ${d.getDate()}`
 }
 
+/** "Thu, Oct 15" */
 export function formatDateShort(date: string): string {
-  return parseISODate(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const d = parseISODate(date)
+  return `${DOW_SHORT[d.getDay()]}, ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`
 }
 
+/** "Oct 15" */
+export function formatMonthDay(date: string): string {
+  const d = parseISODate(date)
+  return `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`
+}
+
+/** "October 2026" */
 export function formatMonth(year: number, month: number): string {
-  return new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-}
-
-export function shortWeekday(date: string): string {
-  return parseISODate(date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
-}
-
-export function shortMonth(date: string): string {
-  return parseISODate(date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
-}
-
-export function dayOfMonth(date: string): number {
-  return parseISODate(date).getDate()
+  return `${MONTH_LONG[month]} ${year}`
 }
 
 export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 }

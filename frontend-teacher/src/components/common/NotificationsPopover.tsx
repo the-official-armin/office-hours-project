@@ -1,7 +1,7 @@
 // Shared: changes need a PR note and a teammate review.
 // Purpose: bell button and notifications popover. Closes on an outside click or Esc, and closing marks all as read.
 import { useEffect, useRef, useState } from 'react'
-import type { ShellNote } from '../../types'
+import type { Note } from '../../types'
 import Icon from './Icon'
 
 function ago(at: number): string {
@@ -14,7 +14,7 @@ function ago(at: number): string {
 }
 
 interface Props {
-  notes: ShellNote[]
+  notes: Note[]
   onMarkAllRead: () => void
 }
 

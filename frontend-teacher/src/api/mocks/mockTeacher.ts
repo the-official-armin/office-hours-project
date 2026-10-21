@@ -1,206 +1,164 @@
 // Owner: Subgroup B (Teacher desktop UI). Local implementation of the Teacher API, backed by store.ts.
 // Same function names and signatures as the real client in ../teacher.ts so a backend can replace it.
+// The signed-in teacher in mock mode is ME_TEACHER.
 import type {
-  AppNotification,
   Booking,
   BookingRequest,
   DayOff,
-  DayOffPreview,
-  ReminderPrefs,
-  ScheduleView,
-  Schedule,
-  Slot,
-  TeacherProfile,
+  HoursInput,
+  Note,
+  Teacher,
   TeacherSettings,
 } from '../../types'
-import { formatDateShort, formatTime } from '../../lib/dates'
-import { RuleError } from '../errors'
+import { formatDateLong, formatDateShort, formatTime } from '../../lib/dates'
 import {
-  checkRequestTime,
-  countAffectedBookings,
-  generateSlots,
-  scheduleWarnings,
-  validateDayOff,
-  validateSchedule,
-  type RuleResult,
-  type RuleState,
-} from './bookingRules'
-import { notify } from './notify'
-import type { DemoState } from './seed'
-import { getState, mutate, nextId } from './store'
+  affectedOn,
+  applyTimings,
+  checkAccept,
+  checkDayOff,
+  checkHours,
+  findTeacher,
+  hoursNotices,
+  orphanedBookings,
+} from '../../lib/rules'
+import { RuleError } from '../errors'
+import { assertOk, delay, pushNote, worldOf } from './actions'
+import { ME_STUDENT, ME_TEACHER, type DemoState } from './seed'
+import { getState, mutate } from './store'
 
-export function delay(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 150 + Math.random() * 150))
+const me = (d: DemoState): Teacher => {
+  const t = findTeacher(worldOf(d), ME_TEACHER)
+  if (!t) throw new RuleError('not_found', 'Teacher not found.')
+  return t
 }
 
-export function ruleState(s: DemoState): RuleState {
-  return { schedule: s.schedule, daysOff: s.daysOff, bookings: s.bookings }
-}
-
-export function assertOk(result: RuleResult): void {
-  if (!result.ok) throw new RuleError(result.code, result.message)
-}
-
-function byDateTime<T extends { date: string; start: string }>(a: T, b: T): number {
-  return (a.date + a.start).localeCompare(b.date + b.start)
-}
+const byDateTime = <T extends { date: string }>(a: T & { time?: string }, b: T & { time?: string }) =>
+  (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? ''))
 
 export const mockTeacherApi = {
-  async getMe(): Promise<TeacherProfile> {
+  async getTeacher(): Promise<Teacher> {
     await delay()
-    return getState().profile
+    return me(getState())
   },
 
-  async getReminderPrefs(): Promise<ReminderPrefs> {
+  async getSettings(): Promise<TeacherSettings> {
     await delay()
-    return getState().prefs
+    const d = getState()
+    const t = me(d)
+    return { name: t.name, subject: t.subject, ...d.teacherPrefs }
   },
 
-  async saveSettings(settings: TeacherSettings): Promise<TeacherSettings> {
+  async saveSettings(input: TeacherSettings): Promise<TeacherSettings> {
     await delay()
-    const { profile, prefs } = settings
-    if (!profile.name.trim()) throw new RuleError('invalid', 'Name cannot be empty.')
-    if (profile.email && !/^\S+@\S+\.\S+$/.test(profile.email)) {
+    const name = input.name.trim()
+    if (!name) throw new RuleError('invalid', 'Enter a name first.')
+    if (input.email.trim() && !/^\S+@\S+\.\S+$/.test(input.email.trim())) {
       throw new RuleError('invalid', 'Enter a valid email address.')
     }
-    if (![30, 60, 1440].includes(prefs.leadMinutes)) throw new RuleError('invalid', 'Pick a reminder time.')
     return mutate((d) => {
-      d.profile = profile
-      d.prefs = prefs
-      return { profile: d.profile, prefs: d.prefs }
+      const t = me(d)
+      t.name = name
+      t.subject = input.subject.trim()
+      const { name: _n, subject: _s, ...prefs } = input
+      d.teacherPrefs = { ...prefs, email: prefs.email.trim() }
+      return { name: t.name, subject: t.subject, ...d.teacherPrefs }
     })
-  },
-
-  async getSchedule(): Promise<ScheduleView> {
-    await delay()
-    const s = getState()
-    return { schedule: s.schedule, warnings: scheduleWarnings(ruleState(s), new Date()) }
-  },
-
-  /** Existing bookings are never deleted; the response lists warnings instead. */
-  async saveSchedule(schedule: Schedule): Promise<ScheduleView> {
-    await delay()
-    assertOk(validateSchedule(schedule))
-    return mutate((d) => {
-      d.schedule = schedule
-      return { schedule: d.schedule, warnings: scheduleWarnings(ruleState(d), new Date()) }
-    })
-  },
-
-  async getSlots(from: string, to: string): Promise<Slot[]> {
-    await delay()
-    return generateSlots(ruleState(getState()), from, to)
   },
 
   async getBookings(): Promise<Booking[]> {
     await delay()
-    return [...getState().bookings].sort(byDateTime)
-  },
-
-  async cancelBooking(id: string): Promise<void> {
-    await delay()
-    mutate((d) => {
-      const b = d.bookings.find((x) => x.id === id)
-      if (!b) throw new RuleError('invalid', 'That booking no longer exists.')
-      d.bookings = d.bookings.filter((x) => x.id !== id)
-      notify(
-        d,
-        'cancellation',
-        'Booking cancelled',
-        `${b.studentName} cancelled ${b.timingName ?? 'a visit'} on ${formatDateShort(b.date)}.`,
-      )
-    })
+    return getState().bookings.filter((b) => b.teacherId === ME_TEACHER)
   },
 
   async getRequests(): Promise<BookingRequest[]> {
     await delay()
-    return [...getState().requests].sort(byDateTime)
+    return getState()
+      .requests.filter((r) => r.teacherId === ME_TEACHER)
+      .sort(byDateTime)
   },
 
-  /** Rule 6: accepting creates a booking, still subject to the past and day-off rules. */
-  async acceptRequest(id: string): Promise<Booking> {
+  /**
+   * Saves the timings and seats. Existing bookings are kept, never deleted. Students whose booking no longer matches
+   * (moved, no longer held, removed) are told. `orphaned` is how many upcoming bookings no longer match an office hour.
+   */
+  async saveHours(input: HoursInput): Promise<{ orphaned: number }> {
     await delay()
     return mutate((d) => {
-      const r = d.requests.find((x) => x.id === id)
-      if (!r) throw new RuleError('invalid', 'That request no longer exists.')
-      assertOk(checkRequestTime(ruleState(d), r.date, r.start, new Date()))
-      d.requests = d.requests.filter((x) => x.id !== id)
-      const booking: Booking = {
-        id: nextId(d, 'b'),
-        studentName: r.studentName,
-        reason: r.reason,
-        date: r.date,
-        start: r.start,
-        end: r.end,
-        slotId: null,
-        timingName: null,
-        createdAt: new Date().toISOString(),
+      const now = new Date()
+      assertOk(checkHours(worldOf(d), ME_TEACHER, input, now))
+      const orphaned = orphanedBookings(worldOf(d), ME_TEACHER, input.timings, now).length
+      const notices = hoursNotices(worldOf(d), ME_TEACHER, input.timings, now)
+      const t = me(d)
+      t.timings = applyTimings(t.timings, input.timings)
+      t.max = input.max
+      for (const n of notices) if (n.studentId === ME_STUDENT) pushNote(d, 'student', n.text, d.studentPrefs.out)
+      return { orphaned }
+    })
+  },
+
+  /** A day off is allowed even when bookings exist; they are kept and `affected` says how many. */
+  async addDayOff(input: { date: string; reason: string }): Promise<{ dayOff: DayOff; affected: number }> {
+    await delay()
+    return mutate((d) => {
+      const now = new Date()
+      const t = me(d)
+      assertOk(checkDayOff(t, input.date, now))
+      const affected = affectedOn(worldOf(d), ME_TEACHER, input.date, now)
+      const dayOff: DayOff = { date: input.date, reason: input.reason.trim() || 'Day off' }
+      t.daysOff = [...t.daysOff, dayOff].sort((a, b) => a.date.localeCompare(b.date))
+      for (const b of affected) {
+        if (b.studentId !== ME_STUDENT) continue
+        pushNote(d, 'student', `${t.name} is out on ${formatDateLong(input.date)}. Cancel your booking and pick another time.`, d.studentPrefs.out)
       }
-      d.bookings.push(booking)
-      notify(
-        d,
-        'booking',
-        'Request accepted',
-        `${r.studentName} is booked for ${formatDateShort(r.date)} at ${formatTime(r.start)}.`,
-      )
-      return booking
+      return { dayOff, affected: affected.length }
     })
   },
 
-  async declineRequest(id: string): Promise<void> {
+  async removeDayOff(date: string): Promise<void> {
     await delay()
     mutate((d) => {
-      const r = d.requests.find((x) => x.id === id)
-      if (!r) throw new RuleError('invalid', 'That request no longer exists.')
-      d.requests = d.requests.filter((x) => x.id !== id)
-      notify(
-        d,
-        'request',
-        'Request declined',
-        `You declined ${r.studentName}'s request for ${formatDateShort(r.date)} at ${formatTime(r.start)}.`,
-      )
+      const now = new Date()
+      const t = me(d)
+      if (!t.daysOff.some((x) => x.date === date)) throw new RuleError('not_found', 'That day off no longer exists.')
+      t.daysOff = t.daysOff.filter((x) => x.date !== date)
+      for (const b of affectedOn(worldOf(d), ME_TEACHER, date, now)) {
+        if (b.studentId !== ME_STUDENT) continue
+        pushNote(d, 'student', `${t.name} is back on ${formatDateLong(date)}. Your booking is on again.`, d.studentPrefs.out)
+      }
     })
   },
 
-  async getDaysOff(): Promise<DayOff[]> {
-    await delay()
-    return [...getState().daysOff].sort((a, b) => a.date.localeCompare(b.date))
-  },
-
-  /** Rule 4: tells the UI how many bookings a day off would affect before it saves. */
-  async previewDayOff(date: string): Promise<DayOffPreview> {
-    await delay()
-    const s = getState()
-    assertOk(validateDayOff(ruleState(s), date, new Date()))
-    return { date, affectedBookings: countAffectedBookings(s.bookings, date) }
-  },
-
-  async addDayOff(input: { date: string; reason: string }): Promise<DayOff> {
+  /** Accepting agrees to the requested time (it does not create a seat). It is refused if that time has passed or is a day off. */
+  async answerRequest(id: string, answer: 'accepted' | 'declined'): Promise<BookingRequest> {
     await delay()
     return mutate((d) => {
-      assertOk(validateDayOff(ruleState(d), input.date, new Date()))
-      const dayOff: DayOff = { id: nextId(d, 'd'), date: input.date, reason: input.reason.trim() }
-      d.daysOff.push(dayOff)
-      return dayOff
+      const t = me(d)
+      const r = d.requests.find((x) => x.id === id && x.teacherId === ME_TEACHER && x.status === 'pending')
+      if (!r) throw new RuleError('not_found', 'That request was already answered.')
+      if (answer === 'accepted') assertOk(checkAccept(worldOf(d), r, new Date()))
+      r.status = answer
+      r.note = `${t.name} ${answer === 'accepted' ? 'accepted' : 'declined'} this time.`
+      if (r.studentId === ME_STUDENT) {
+        pushNote(
+          d,
+          'student',
+          `${t.name} ${answer === 'accepted' ? 'accepted' : 'declined'} your request for ${formatDateShort(r.date)} at ${formatTime(r.time)}.`,
+          d.studentPrefs.answer,
+        )
+      }
+      return { ...r }
     })
   },
 
-  async removeDayOff(id: string): Promise<void> {
+  async getNotes(): Promise<Note[]> {
     await delay()
-    mutate((d) => {
-      d.daysOff = d.daysOff.filter((x) => x.id !== id)
-    })
+    return getState().notes.teacher
   },
 
-  async getNotifications(): Promise<AppNotification[]> {
-    await delay()
-    return getState().notifications
-  },
-
-  async markAllNotificationsRead(): Promise<void> {
+  async markNotesRead(): Promise<void> {
     await delay()
     mutate((d) => {
-      d.notifications = d.notifications.map((n) => ({ ...n, read: true }))
+      d.notes.teacher = d.notes.teacher.map((n) => ({ ...n, read: true }))
     })
   },
 }

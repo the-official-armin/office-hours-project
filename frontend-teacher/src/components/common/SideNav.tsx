@@ -2,14 +2,14 @@
 // Purpose: sidebar content: brand, nav tree with expandable groups, the signed-in person, and log out.
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import type { Role, ShellBadges, ShellUser } from '../../types'
+import type { Role, ShellBadges, ShellData } from '../../types'
 import { initials } from '../../lib/dates'
 import Icon from './Icon'
 import { isCurrent, isGroup, NAV_TREE, ROLE_LABEL, type NavLeaf } from './nav'
 
 interface Props {
   role: Role
-  user: ShellUser
+  user: ShellData['user']
   badges: ShellBadges
   onLogout: () => void
 }

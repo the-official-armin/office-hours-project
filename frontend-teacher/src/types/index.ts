@@ -1,153 +1,160 @@
 // Shared: changes need a PR note and a teammate review.
-// Purpose: Teacher types mirroring the PLANNED API shapes in docs/api-contract.md.
+// Purpose: the one source of types. They mirror the PLANNED API shapes in docs/api-contract.md.
 // Dates are "YYYY-MM-DD" and times are "HH:MM" (24h), both in the school's local time.
-
-export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri'
-export type TimingId = 'first' | 'second'
-
-export interface Timing {
-  id: TimingId
-  name: string
-  start: string
-  end: string
-  days: Weekday[]
-}
-
-export interface Schedule {
-  timings: [Timing, Timing]
-  seatsPerOfficeHour: number
-}
-
-/** One concrete office hour on one date (derived from the schedule). */
-export interface Slot {
-  id: string
-  date: string
-  timingId: TimingId
-  name: string
-  start: string
-  end: string
-  maxStudents: number
-  booked: number
-}
-
-export interface Booking {
-  id: string
-  studentName: string
-  reason: string
-  date: string
-  start: string
-  end: string
-  /** null when the booking came from an accepted request outside the schedule. */
-  slotId: string | null
-  timingName: string | null
-  createdAt: string
-}
-
-export interface BookingRequest {
-  id: string
-  studentName: string
-  reason: string
-  date: string
-  start: string
-  end: string
-  createdAt: string
-}
-
-export interface DayOff {
-  id: string
-  date: string
-  reason: string
-}
-
-export interface DayOffPreview {
-  date: string
-  affectedBookings: number
-}
-
-export interface ReminderPrefs {
-  beforeOfficeHour: boolean
-  studentBooks: boolean
-  studentCancels: boolean
-  studentRequests: boolean
-  morningSummary: boolean
-  /** Minutes before the office hour: 30, 60 or 1440. */
-  leadMinutes: number
-}
-
-export interface TeacherProfile {
-  name: string
-  subject: string
-  email: string
-}
-
-export interface TeacherSettings {
-  profile: TeacherProfile
-  prefs: ReminderPrefs
-}
-
-export type NotificationType = 'booking' | 'cancellation' | 'request' | 'reminder'
-
-export interface AppNotification {
-  id: string
-  type: NotificationType
-  title: string
-  body: string
-  createdAt: string
-  read: boolean
-  /** Dedupe key for generated reminders. */
-  key?: string
-}
-
-export type WarningKind = 'over_capacity' | 'unscheduled'
-
-/** Raised when a schedule change leaves existing bookings in an odd state. Bookings are never deleted. */
-export interface ScheduleWarning {
-  kind: WarningKind
-  date: string
-  timingName: string
-  booked: number
-  max: number
-}
-
-export interface ScheduleView {
-  schedule: Schedule
-  warnings: ScheduleWarning[]
-}
-
-export type RuleCode =
-  | 'past'
-  | 'day_off'
-  | 'full'
-  | 'no_office_hour'
-  | 'duplicate_day_off'
-  | 'invalid'
 
 export type Role = 'student' | 'teacher'
 
-/** What the app shell (sidebar, top bar, tab bar) needs to know about the signed-in person. */
-export interface ShellUser {
+/** Weekday as JavaScript numbers it: 1 = Monday ... 5 = Friday. */
+export type Dow = 1 | 2 | 3 | 4 | 5
+
+export interface Timing {
+  id: string
   name: string
-  /** Subject for teachers, grade for students. */
-  subtitle: string
+  start: string
+  end: string
+  days: Dow[]
+  /**
+   * A timing the teacher removed. It stays on file with no days so existing bookings still know what they were for.
+   */
+  gone?: boolean
 }
 
-export interface ShellNote {
+export interface DayOff {
+  date: string
+  reason: string
+}
+
+export interface Teacher {
+  id: string
+  name: string
+  subject: string
+  /** Subject group, used for the filter pills on "Find a teacher". */
+  group: string
+  /** Seats per office hour, 1-30. */
+  max: number
+  timings: Timing[]
+  daysOff: DayOff[]
+}
+
+export type BookingStatus = 'confirmed' | 'cancelled'
+
+export interface Booking {
+  id: string
+  teacherId: string
+  date: string
+  timingId: string
+  seat: number
+  studentId: string
+  studentName: string
+  reason: string
+  status: BookingStatus
+}
+
+export type RequestStatus = 'pending' | 'accepted' | 'declined'
+
+/** "Request a different time": a student asks for a time outside the teacher's office hours. */
+export interface BookingRequest {
+  id: string
+  teacherId: string
+  studentId: string
+  studentName: string
+  date: string
+  time: string
+  reason: string
+  status: RequestStatus
+  /** The teacher's answer, shown to the student. */
+  note: string
+}
+
+export type ReminderLead = '30 minutes' | '1 hour' | '1 day'
+
+export interface TeacherPrefs {
+  email: string
+  /** Reminder before each office hour. */
+  remind: boolean
+  /** A student books a seat. */
+  booking: boolean
+  /** A student cancels. */
+  cancel: boolean
+  /** A student sends a request. */
+  request: boolean
+  /** Morning summary on days with office hours. */
+  morning: boolean
+  lead: ReminderLead
+}
+
+export interface StudentPrefs {
+  name: string
+  grade: string
+  email: string
+  /** Reminder before each booked office hour. */
+  remind: boolean
+  /** Booking confirmations. */
+  booked: boolean
+  /** The teacher answers a request. */
+  answer: boolean
+  /** The teacher is out or moves an office hour. */
+  out: boolean
+  lead: ReminderLead
+}
+
+/** What the Teacher Settings page edits: the teacher's own record plus email preferences. */
+export interface TeacherSettings extends TeacherPrefs {
+  name: string
+  subject: string
+}
+
+export type StudentSettings = StudentPrefs
+
+export interface Note {
   id: string
   text: string
   /** Epoch milliseconds. */
   at: number
   read: boolean
+  /** Dedupe key for generated reminders. */
+  key?: string
 }
 
-export interface ShellBadges {
-  /** Teacher: open booking requests. */
-  requests: number
-  /** Student: upcoming bookings flagged as disrupted. */
-  disrupted: number
+/** What the Office hours editor sends: the timings to keep, and seats per office hour. */
+export interface TimingDraft {
+  id: string
+  name: string
+  start: string
+  end: string
+  days: Dow[]
 }
 
+export interface HoursInput {
+  timings: TimingDraft[]
+  max: number
+}
+
+export type RuleCode =
+  | 'not_found'
+  | 'missing'
+  | 'invalid'
+  | 'past'
+  | 'day_off'
+  | 'no_office_hour'
+  | 'bad_seat'
+  | 'seat_taken'
+  | 'already_booked'
+  | 'conflict'
+  | 'reason'
+  | 'duplicate_day_off'
+  | 'seat_floor'
+
+/** What the app shell (sidebar, top bar, tab bar) shows. */
 export interface ShellData {
-  user: ShellUser
-  notes: ShellNote[]
-  badges: ShellBadges
+  user: { name: string; subtitle: string }
+  notes: Note[]
+  badges: {
+    /** Teacher: open booking requests. */
+    requests: number
+    /** Student: upcoming bookings flagged as disrupted. */
+    disrupted: number
+  }
 }
+
+export type ShellBadges = ShellData['badges']

@@ -1,8 +1,8 @@
-// Owner: Subgroup B (Teacher desktop UI). The local "database" for the demo: localStorage with an in-memory fallback.
+// Owner: Subgroup B (Teacher desktop UI). The local "database" for mock mode: localStorage with an in-memory fallback.
 // Only src/api/ may import this file. Pages and hooks never touch storage.
-import { seedState, STORAGE_VERSION, type DemoState } from './seed'
+import { isDemoState, seedState, type DemoState } from './seed'
 
-export const STORAGE_KEY = 'officehours.demo.v1'
+export const STORAGE_KEY = 'officehours.demo.v2'
 
 let current: DemoState | null = null
 const listeners = new Set<() => void>()
@@ -21,23 +21,6 @@ function writeRaw(value: string): void {
   } catch {
     // Storage unavailable (private window, blocked site data). State stays in memory only.
   }
-}
-
-function isDemoState(x: unknown): x is DemoState {
-  if (!x || typeof x !== 'object') return false
-  const s = x as Partial<DemoState>
-  return (
-    s.version === STORAGE_VERSION &&
-    typeof s.loggedIn === 'boolean' &&
-    !!s.profile &&
-    !!s.prefs &&
-    !!s.schedule &&
-    Array.isArray(s.daysOff) &&
-    Array.isArray(s.bookings) &&
-    Array.isArray(s.requests) &&
-    Array.isArray(s.notifications) &&
-    typeof s.seq === 'number'
-  )
 }
 
 function emit(): void {
@@ -77,14 +60,14 @@ export function mutate<T>(fn: (draft: DemoState) => T): T {
   return result
 }
 
-/** Restore the seed. Keeps the current login so the demo does not log you out. */
+/** Restore the example data. Keeps the current login so a reset does not sign you out. */
 export function resetState(): void {
-  const { loggedIn, role } = getState()
-  commit({ ...seedState(new Date(), loggedIn), role })
+  commit(seedState(new Date(), getState().session))
 }
 
 export function nextId(draft: DemoState, prefix: string): string {
-  return `${prefix}${draft.seq++}`
+  draft.seq += 1
+  return `${prefix}${draft.seq}`
 }
 
 export function subscribe(listener: () => void): () => void {

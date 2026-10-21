@@ -14,7 +14,6 @@ import StudentHome from '../pages/student/StudentHome'
 import StudentSettings from '../pages/student/StudentSettings'
 import BookingRequests from '../pages/teacher/BookingRequests'
 import DaysOff from '../pages/teacher/DaysOff'
-import DemoTools from '../pages/teacher/DemoTools'
 import OfficeHourSettings from '../pages/teacher/OfficeHourSettings'
 import TeacherCalendar from '../pages/teacher/TeacherCalendar'
 import TeacherDashboard from '../pages/teacher/TeacherDashboard'
@@ -49,8 +48,6 @@ export default function AppRoutes() {
           <Route path="days-off" element={<DaysOff />} />
           <Route path="requests" element={<BookingRequests />} />
           <Route path="settings" element={<TeacherSettings />} />
-          {/* Not in the sidebar: stands in for the Student side until Phase 4. */}
-          <Route path="demo" element={<DemoTools />} />
         </Route>
       </Route>
 
