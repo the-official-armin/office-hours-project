@@ -11,6 +11,7 @@ import {
   checkHours,
   checkRequest,
   disruption,
+  firstBookableDay,
   hoursNotices,
   listSlots,
   minSeats,
@@ -19,6 +20,7 @@ import {
   pendingRequests,
   slotRows,
   stepSeats,
+  studentDay,
   upcomingBookings,
   validateHours,
   type World,
@@ -371,5 +373,54 @@ describe('lookups', () => {
       id, teacherId, studentId: 's', studentName: 'S', date, time: '15:30', reason: 'A reason here', status, note: '',
     })
     expect(pendingRequests([r('b', NEXT_THU, 'pending'), r('a', NEXT_TUE, 'pending'), r('c', NEXT_TUE, 'accepted'), r('d', NEXT_TUE, 'pending', 'okafor')], 'rivera').map((x) => x.id)).toEqual(['a', 'b'])
+  })
+})
+
+describe('what a student sees', () => {
+  const me = 'maya'
+
+  it('classifies a day: selectable, left, mine, full, started', () => {
+    const w = world({
+      bookings: [
+        booking({ date: NEXT_TUE, seat: 1, studentId: me }),
+        ...[2, 3, 4].map((seat) => booking({ date: NEXT_THU, seat })),
+        ...[1, 2, 3, 4].map((seat) => booking({ date: NEXT_THU, seat, timingId: 'after' })),
+      ],
+    })
+    const t = w.teachers[0]
+    expect(studentDay(w, t, NEXT_TUE, NOW, me)).toMatchObject({ selectable: true, mine: true, full: false, left: 7 })
+    expect(studentDay(w, t, NEXT_THU, NOW, me)).toMatchObject({ selectable: true, mine: false, left: 1 })
+    expect(studentDay(w, t, NEXT_WED, NOW, me)).toMatchObject({ selectable: false })
+    expect(studentDay(w, t, '2026-10-13', NOW, me)).toMatchObject({ selectable: false, past: true })
+  })
+
+  it('is full only when bookable and every seat in every unstarted office hour is taken', () => {
+    const w = world({
+      bookings: [1, 2, 3, 4].flatMap((seat) => [
+        booking({ date: NEXT_TUE, seat }),
+        booking({ date: NEXT_TUE, seat, timingId: 'after' }),
+      ]),
+    })
+    expect(studentDay(w, w.teachers[0], NEXT_TUE, NOW, me)).toMatchObject({ full: true, left: 0, bookable: true })
+  })
+
+  it('treats a day whose office hours all started as selectable but not bookable', () => {
+    const w = world()
+    const late = new Date(2026, 9, 15, 17, 0)
+    expect(studentDay(w, w.teachers[0], TODAY, late, me)).toMatchObject({ selectable: true, bookable: false, full: false })
+  })
+
+  it('blocks a day off', () => {
+    const w = world()
+    w.teachers[0].daysOff = [{ date: NEXT_TUE, reason: '' }]
+    expect(studentDay(w, w.teachers[0], NEXT_TUE, NOW, me)).toMatchObject({ selectable: false, off: true })
+  })
+
+  it('finds the first day with a seat to book', () => {
+    const w = world()
+    expect(firstBookableDay(w, w.teachers[0], TODAY, NOW)).toBe(TODAY) // after school today is still ahead
+    expect(firstBookableDay(w, w.teachers[0], TODAY, new Date(2026, 9, 15, 17, 0))).toBe(NEXT_TUE)
+    w.teachers[0].timings = []
+    expect(firstBookableDay(w, w.teachers[0], TODAY, NOW)).toBe(TODAY)
   })
 })

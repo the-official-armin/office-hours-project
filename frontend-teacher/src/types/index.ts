@@ -84,6 +84,7 @@ export interface TeacherPrefs {
 }
 
 export interface StudentPrefs {
+  id: string
   name: string
   grade: string
   email: string

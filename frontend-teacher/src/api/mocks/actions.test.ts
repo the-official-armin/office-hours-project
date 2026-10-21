@@ -260,7 +260,11 @@ describe('data the student sees', () => {
     expect(mine.length).toBeGreaterThan(0)
     expect(mine.every((b: Booking) => b.studentId === ME_STUDENT)).toBe(true)
     expect((await student.getRequests()).every((r) => r.studentId === ME_STUDENT)).toBe(true)
-    const seats = await student.getTeacherBookings('brooks')
-    expect(seats.every((b) => b.teacherId === 'brooks' && b.status === 'confirmed')).toBe(true)
+    const seats = await student.getSeatBookings()
+    expect(seats.every((b) => b.status === 'confirmed')).toBe(true)
+    expect(seats.some((b) => b.teacherId === 'brooks')).toBe(true)
+    // Other students are anonymous, the student's own bookings are complete.
+    expect(seats.filter((b) => b.studentId !== ME_STUDENT).every((b) => b.studentName === '' && b.reason === '')).toBe(true)
+    expect(seats.filter((b) => b.studentId === ME_STUDENT).every((b) => b.reason !== '')).toBe(true)
   })
 })

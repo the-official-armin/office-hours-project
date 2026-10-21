@@ -9,8 +9,8 @@ export type { BookSeatInput, SendRequestInput }
 
 export interface StudentApi {
   getTeachers(): Promise<Teacher[]>
-  /** Confirmed bookings of one teacher (all students), so the seat grid can show which seats are taken. */
-  getTeacherBookings(teacherId: string): Promise<Booking[]>
+  /** Every confirmed booking of every teacher with other students' names and reasons removed (seat counts only). */
+  getSeatBookings(): Promise<Booking[]>
   /** This student's bookings, every status. */
   getBookings(): Promise<Booking[]>
   getRequests(): Promise<BookingRequest[]>
@@ -28,7 +28,7 @@ const body = (value: unknown): RequestInit => ({ body: JSON.stringify(value) })
 
 const realStudentApi: StudentApi = {
   getTeachers: () => request('/teachers'),
-  getTeacherBookings: (teacherId) => request(`/teachers/${teacherId}/bookings`),
+  getSeatBookings: () => request('/bookings/seats'),
   getBookings: () => request('/student/bookings'),
   getRequests: () => request('/student/requests'),
   bookSeat: (input) => request('/student/bookings', { method: 'POST', ...body(input) }),

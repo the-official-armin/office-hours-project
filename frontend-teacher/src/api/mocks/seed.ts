@@ -191,7 +191,7 @@ export function seedState(now: Date, session: Role | null = null): DemoState {
     requests,
     notes,
     teacherPrefs: { email: '', remind: true, booking: true, cancel: true, request: true, morning: false, lead: '1 hour' },
-    studentPrefs: { name: 'Maya K.', grade: 'Grade 10', email: '', remind: true, booked: true, answer: true, out: true, lead: '1 hour' },
+    studentPrefs: { id: ME_STUDENT, name: 'Maya K.', grade: 'Grade 10', email: '', remind: true, booked: true, answer: true, out: true, lead: '1 hour' },
     seq,
   }
 }

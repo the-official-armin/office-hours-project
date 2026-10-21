@@ -388,3 +388,43 @@ export function firstOfficeDay(w: World, t: Teacher, from: string, now: Date): s
   }
   return from
 }
+
+/** How a day looks to a student choosing where to book. */
+export interface StudentDay {
+  past: boolean
+  off: boolean
+  rows: SlotRow[]
+  /** The day can be opened: not past, not a day off, and the teacher holds office hours. */
+  selectable: boolean
+  /** Open seats left in office hours that have not started. */
+  left: number
+  /** At least one office hour has not started yet. */
+  bookable: boolean
+  /** The student already holds a seat this day. */
+  mine: boolean
+  /** Bookable, but no seats left anywhere. */
+  full: boolean
+}
+
+export function studentDay(w: World, t: Teacher, date: string, now: Date, studentId: string): StudentDay {
+  const past = date < toISODate(now)
+  const off = isOff(t, date)
+  const rows = slotRows(w, t, date, now)
+  const selectable = !past && !off && rows.length > 0
+  let left = 0
+  let bookable = false
+  let mine = false
+  for (const r of rows) {
+    if (r.bookings.some((b) => b.studentId === studentId)) mine = true
+    if (!r.started) {
+      bookable = true
+      left += Math.max(0, r.left)
+    }
+  }
+  return { past, off, rows, selectable, left, bookable, mine, full: selectable && bookable && left === 0 }
+}
+
+/** The first day from `from` on with an office hour that can still be booked, or `from` when there is none. */
+export function firstBookableDay(w: World, t: Teacher, from: string, now: Date): string {
+  return listSlots(w, t, from, 120, now)[0]?.date ?? from
+}

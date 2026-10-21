@@ -15,6 +15,8 @@ export interface DayRender {
   content: ReactNode
   /** Greys the cell out. */
   past?: boolean
+  /** Cannot be opened (e.g. a day with nothing to book). Never shown as selected. */
+  disabled?: boolean
 }
 
 export type MiniStatus = 'open' | 'full' | 'off' | 'past' | 'none'
@@ -96,7 +98,7 @@ export function CalendarGrid({ cal, today, onSelect, renderDay, renderMini }: Gr
                   wk.map((date) => {
                     if (parseISODate(date).getMonth() !== mo.m) return <span key={date} aria-hidden="true" className="invisible h-[38px]" />
                     const m = renderMini(date)
-                    const selected = cal.sel === date
+                    const selected = cal.sel === date && !m.disabled
                     return (
                       <button
                         key={date}
@@ -148,7 +150,7 @@ export function CalendarGrid({ cal, today, onSelect, renderDay, renderMini }: Gr
           const r = renderDay(date, view)
           const d = parseISODate(date)
           const isToday = date === today
-          const selected = cal.sel === date
+          const selected = cal.sel === date && !r.disabled
           const label =
             view === 'week'
               ? `${DOW_SHORT[dowOf(date)]} ${d.getDate()}`
@@ -160,6 +162,7 @@ export function CalendarGrid({ cal, today, onSelect, renderDay, renderMini }: Gr
             <button
               key={date}
               type="button"
+              disabled={r.disabled}
               aria-pressed={selected}
               aria-label={r.aria}
               onClick={() => onSelect(date)}
@@ -167,7 +170,7 @@ export function CalendarGrid({ cal, today, onSelect, renderDay, renderMini }: Gr
                 view === 'week' ? 'min-h-[260px] gap-2 max-[640px]:min-h-0' : 'min-h-28 gap-1.5 max-[640px]:min-h-[76px] max-[640px]:gap-1 max-[640px]:rounded-[10px] max-[640px]:p-1.5'
               } ${r.past ? 'border-line bg-past' : 'border-line bg-surface'} ${isToday ? 'border-brand' : ''} ${
                 selected ? 'shadow-[0_0_0_2px_var(--brand)]' : ''
-              }`}
+              } disabled:cursor-default`}
             >
               <span
                 className={`flex flex-wrap items-center justify-between gap-1 ${view === 'week' ? '' : 'max-[640px]:flex-col max-[640px]:items-start max-[640px]:gap-0.5'}`}

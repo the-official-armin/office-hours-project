@@ -29,10 +29,15 @@ export const mockStudentApi = {
     return getState().teachers
   },
 
-  /** Confirmed bookings of one teacher (all students), so the seat grid can show which seats are taken. */
-  async getTeacherBookings(teacherId: string): Promise<Booking[]> {
+  /**
+   * Every confirmed booking of every teacher, so seat grids and "open seats" can count seats. Other students'
+   * names and reasons are removed: a student only learns that a seat is taken, never by whom.
+   */
+  async getSeatBookings(): Promise<Booking[]> {
     await delay()
-    return getState().bookings.filter((b) => b.teacherId === teacherId && b.status === 'confirmed')
+    return getState()
+      .bookings.filter((b) => b.status === 'confirmed')
+      .map((b) => (b.studentId === ME_STUDENT ? b : { ...b, studentName: '', reason: '' }))
   },
 
   /** This student's bookings, including cancelled ones. */
@@ -139,7 +144,7 @@ export const mockStudentApi = {
       throw new RuleError('invalid', 'Enter a valid email address.')
     }
     return mutate((d) => {
-      d.studentPrefs = { ...input, name: input.name.trim(), grade: input.grade.trim(), email: input.email.trim() }
+      d.studentPrefs = { ...input, id: d.studentPrefs.id, name: input.name.trim(), grade: input.grade.trim(), email: input.email.trim() }
       return d.studentPrefs
     })
   },
