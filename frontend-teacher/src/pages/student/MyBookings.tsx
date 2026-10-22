@@ -27,11 +27,23 @@ export default function MyBookings() {
   const [cancelId, setCancelId] = useState('')
   const [message, setMessage] = useState('')
   const yesRef = useRef<HTMLButtonElement>(null)
-  const askedFrom = useRef<HTMLElement | null>(null)
+  const messageRef = useRef<HTMLDivElement>(null)
+  // The Cancel buttons, so focus can go back to the right one after "Keep it" (the button is re-created).
+  const cancelButtons = useRef(new Map<string, HTMLButtonElement | null>())
+  const returnTo = useRef<string | null>(null)
 
   useEffect(() => {
-    if (cancelId) yesRef.current?.focus()
+    if (cancelId) {
+      yesRef.current?.focus()
+    } else if (returnTo.current) {
+      cancelButtons.current.get(returnTo.current)?.focus()
+      returnTo.current = null
+    }
   }, [cancelId])
+
+  useEffect(() => {
+    if (message) messageRef.current?.focus()
+  }, [message])
 
   const world = myWorld(data)
   const up = upcomingBookings(world, () => true, now)
@@ -90,7 +102,12 @@ export default function MyBookings() {
           </Pill>
         </div>
         <ErrorText>{error}</ErrorText>
-        <div role="status" className={message && tab === 'up' ? 'mb-2 rounded-xl bg-tint px-4 py-3 text-sm font-semibold text-tint-ink' : ''}>
+        <div
+          ref={messageRef}
+          tabIndex={-1}
+          role="status"
+          className={message && tab === 'up' ? 'mb-2 rounded-xl bg-tint px-4 py-3 text-sm font-semibold text-tint-ink outline-none' : ''}
+        >
           {tab === 'up' ? message : ''}
         </div>
 
@@ -118,10 +135,12 @@ export default function MyBookings() {
                   </div>
                   {!asking && (
                     <Button
+                      ref={(el) => {
+                        cancelButtons.current.set(b.id, el)
+                      }}
                       variant="danger"
                       aria-label={`Cancel booking with ${t?.name} on ${formatDateShort(b.date)}`}
-                      onClick={(e) => {
-                        askedFrom.current = e.currentTarget
+                      onClick={() => {
                         setMessage('')
                         setCancelId(b.id)
                       }}
@@ -138,8 +157,8 @@ export default function MyBookings() {
                         <Button
                           disabled={isPending(b.id)}
                           onClick={() => {
+                            returnTo.current = b.id
                             setCancelId('')
-                            askedFrom.current?.focus()
                           }}
                         >
                           Keep it

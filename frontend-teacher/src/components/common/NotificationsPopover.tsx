@@ -99,7 +99,7 @@ export default function NotificationsPopover({ notes, onMarkAllRead }: Props) {
             ))
           )}
           <div className="flex justify-end border-t border-line px-4 py-2.5">
-            <button type="button" onClick={onMarkAllRead} className="text-sm font-bold text-link">
+            <button type="button" onClick={onMarkAllRead} className="inline-flex min-h-11 items-center text-sm font-bold text-link">
               Mark all as read
             </button>
           </div>

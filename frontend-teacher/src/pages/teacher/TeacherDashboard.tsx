@@ -35,7 +35,7 @@ function greeting(hour: number): string {
 
 function ViewAll({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <TextButton onClick={onClick} className="inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap">
+    <TextButton onClick={onClick} className="gap-1.5 whitespace-nowrap">
       {label}
       <Icon name="expand" size={16} strokeWidth={2} />
     </TextButton>
@@ -77,7 +77,7 @@ export default function TeacherDashboard() {
             <Card aria-labelledby="next-h">
               <div className="flex items-center justify-between gap-3">
                 <Eyebrow id="next-h">Next office hour</Eyebrow>
-                <Link to={`/teacher/calendar?day=${next.date}`} className="text-sm font-bold text-link">
+                <Link to={`/teacher/calendar?day=${next.date}`} className="inline-flex min-h-11 items-center text-sm font-bold text-link">
                   Open in calendar
                 </Link>
               </div>
@@ -179,7 +179,7 @@ export default function TeacherDashboard() {
           <Card aria-labelledby="off-h">
             <CardHead>
               <CardTitle id="off-h">Coming days off</CardTitle>
-              <Link to="/teacher/days-off" className="text-sm font-bold text-link">
+              <Link to="/teacher/days-off" className="inline-flex min-h-11 items-center text-sm font-bold text-link">
                 Manage
               </Link>
             </CardHead>

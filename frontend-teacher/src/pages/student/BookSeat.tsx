@@ -215,7 +215,7 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
     <>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Link to="/student/teachers" className="inline-flex min-h-7 items-center gap-1 text-sm font-bold text-link no-underline">
+          <Link to="/student/teachers" className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-link no-underline">
             <Icon name="left" size={16} strokeWidth={2} />
             All teachers
           </Link>

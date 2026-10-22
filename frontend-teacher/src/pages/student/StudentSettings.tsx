@@ -26,7 +26,7 @@ const TOGGLES: { key: Toggle; label: string; hint: string }[] = [
 ]
 
 const GRADES = ['Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']
-const linkText = 'font-bold text-link'
+const linkText = 'inline-flex min-h-11 w-fit items-center font-bold text-link'
 
 export default function StudentSettings() {
   const { data, now, saveSettings } = useStudentData()

@@ -18,7 +18,7 @@ Whatever one side does shows up on the other: a seat Maya books appears for Ms. 
 | --- | --- |
 | `npm run build` | Type-check and build |
 | `npx vitest run` | Unit and render tests (rules, calendar, themes, contrast, every page) |
-| `npm run e2e` | Playwright tests in a real browser (sidebar stays fixed). First time: `npx playwright install chromium` |
+| `npm run e2e` | Playwright tests in a real browser (fixed sidebar, 390px phone layout and tap targets, keyboard, themes). First time: `npx playwright install chromium` |
 | `npm run lint` | oxlint |
 
 To check the app on any day, run the tests with a fixed date: `$env:VITE_TEST_NOW="2026-10-17T10:00:00"; npx vitest run`.

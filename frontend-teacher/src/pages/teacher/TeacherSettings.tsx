@@ -26,7 +26,7 @@ const TOGGLES: { key: Toggle; label: string; hint: string }[] = [
   { key: 'morning', label: 'Morning summary', hint: 'One email on days you hold office hours.' },
 ]
 
-const linkText = 'font-bold text-link'
+const linkText = 'inline-flex min-h-11 w-fit items-center font-bold text-link'
 
 export default function TeacherSettings() {
   const { data, now, saveSettings } = useTeacherData()

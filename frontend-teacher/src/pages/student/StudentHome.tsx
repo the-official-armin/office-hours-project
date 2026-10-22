@@ -94,7 +94,7 @@ export default function StudentHome() {
         <Card aria-labelledby="up-h" className="flex-[3_1_460px]">
           <CardHead>
             <CardTitle id="up-h">Upcoming bookings</CardTitle>
-            <Link to="/student/bookings" className="text-sm font-bold text-link">
+            <Link to="/student/bookings" className="inline-flex min-h-11 items-center text-sm font-bold text-link">
               See all
             </Link>
           </CardHead>
@@ -131,7 +131,7 @@ export default function StudentHome() {
           <Card aria-labelledby="open-h">
             <CardHead>
               <CardTitle id="open-h">Open seats this week</CardTitle>
-              <Link to="/student/teachers" className="text-sm font-bold text-link">
+              <Link to="/student/teachers" className="inline-flex min-h-11 items-center text-sm font-bold text-link">
                 All teachers
               </Link>
             </CardHead>
