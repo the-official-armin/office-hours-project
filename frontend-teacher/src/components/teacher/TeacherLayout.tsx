@@ -1,62 +1,57 @@
-// Owner: Subgroup B (Teacher desktop UI). Teacher side of the app: loads Teacher data, then renders the shared AppShell.
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { TeacherDataProvider, toTeacherShell, useTeacher } from '../../hooks/TeacherData'
-import { useAuth } from '../../hooks/useAuth'
-import AppShell from '../common/AppShell'
-import Button from '../common/Button'
+// Owner: Subgroup B (Teacher desktop UI). Desktop only (min width 1024px): sidebar + header + main content.
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import Button from './Button'
 
-function Shell() {
-  const t = useTeacher()
-  const { logout } = useAuth()
-  const navigate = useNavigate()
-  const [pageKey, setPageKey] = useState(0)
-
-  if (t.status === 'error' || (t.status === 'ready' && !t.data)) {
-    return (
-      <div className="p-8">
-        <div role="alert" className="max-w-lg rounded-2xl border border-line bg-surface p-6">
-          <p className="font-bold">We could not load your data.</p>
-          <p className="mt-1 text-sm text-muted">{t.error}</p>
-          <Button className="mt-4" onClick={() => void t.refresh().catch(() => undefined)}>
-            Try again
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  if (t.status === 'loading' || !t.data) {
-    return (
-      <div role="status" className="p-8 text-muted">
-        Loading your office hours...
-      </div>
-    )
-  }
-
-  return (
-    <AppShell
-      role="teacher"
-      data={toTeacherShell(t.data)}
-      showExample={t.usingMocks}
-      onMarkAllRead={t.markNotesRead}
-      onReset={async () => {
-        await t.resetExample()
-        setPageKey((k) => k + 1)
-      }}
-      onLogout={() => {
-        logout()
-        navigate('/login', { replace: true })
-      }}
-      pageKey={pageKey}
-    />
-  )
-}
+const links = [
+  { to: '/teacher', label: 'Dashboard', end: true },
+  { to: '/teacher/office-hours', label: 'Office hours' },
+  { to: '/teacher/calendar', label: 'Calendar' },
+  { to: '/teacher/days-off', label: 'Days off' },
+  { to: '/teacher/requests', label: 'Booking requests' },
+  { to: '/teacher/settings', label: 'Settings' },
+]
 
 export default function TeacherLayout() {
+  const navigate = useNavigate()
+
+  // TODO: wire to the real logout once the auth team provides it. Placeholder only.
+  function handleLogout() {
+    try {
+      localStorage.removeItem('token')
+    } catch {
+      // storage unavailable; nothing to clear
+    }
+    navigate('/login')
+  }
+
   return (
-    <TeacherDataProvider>
-      <Shell />
-    </TeacherDataProvider>
+    <div className="flex min-h-screen min-w-[1024px] flex-col">
+      <header className="flex items-center justify-between border-b px-6 py-3">
+        <h1 className="text-lg font-semibold">Office Hours - Teacher</h1>
+        <Button onClick={handleLogout}>Log out</Button>
+      </header>
+      <div className="flex flex-1">
+        <nav className="w-56 shrink-0 border-r bg-gray-50 p-4">
+          <ul className="space-y-1">
+            {links.map((l) => (
+              <li key={l.to}>
+                <NavLink
+                  to={l.to}
+                  end={l.end}
+                  className={({ isActive }) =>
+                    `block rounded px-3 py-2 text-sm ${isActive ? 'bg-indigo-100 font-medium text-indigo-700' : 'hover:bg-gray-100'}`
+                  }
+                >
+                  {l.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <main className="flex-1 p-6">
+          <Outlet />
+        </main>
+      </div>
+    </div>
   )
 }
