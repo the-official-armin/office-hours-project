@@ -20,3 +20,8 @@ __pycache__/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Backend
+*.db
+.pytest_cache/
+*.pyc

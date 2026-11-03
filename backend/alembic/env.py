@@ -6,9 +6,9 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
 
-# This adds your backend folder to the python path so it can find models.py
+# This adds your backend folder to the python path so it can find the app package
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from models import Base
+from app.models import Base  # noqa: E402
 
 # This is the Alembic Config object...
 config = context.config
@@ -18,12 +18,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from models import Base
+# DATABASE_URL wins over alembic.ini (dev: sqlite file, deploy: docker-compose Postgres).
+config.set_main_option(
+    "sqlalchemy.url",
+    os.environ.get("DATABASE_URL", config.get_main_option("sqlalchemy.url")),
+)
+
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
