@@ -2,7 +2,7 @@
 // Only src/api/ may import this file. Pages and hooks never touch storage.
 import { isDemoState, seedState, type DemoState } from './seed'
 
-export const STORAGE_KEY = 'officehours.demo.v2'
+export const STORAGE_KEY = 'officehours.demo.v3'
 
 let current: DemoState | null = null
 const listeners = new Set<() => void>()
@@ -60,9 +60,9 @@ export function mutate<T>(fn: (draft: DemoState) => T): T {
   return result
 }
 
-/** Restore the example data. Keeps the current login so a reset does not sign you out. */
+/** Restore the example data. Sign-in lives in src/auth, so a reset does not sign anyone out. */
 export function resetState(): void {
-  commit(seedState(new Date(), getState().session))
+  commit(seedState(new Date()))
 }
 
 export function nextId(draft: DemoState, prefix: string): string {

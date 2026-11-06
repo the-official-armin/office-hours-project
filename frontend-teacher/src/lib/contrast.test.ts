@@ -114,6 +114,8 @@ const TEXT: Pair[] = [
   { fg: 'side-ink-strong', bg: 'side-hover', over: 'side', note: 'open group with the current page' },
   { fg: 'side-ink-strong', bg: 'side-active', over: 'side', note: 'current page' },
   { fg: 'side-mute', bg: 'side-active', over: 'side' },
+  { fg: 'panel-ink', bg: 'panel', note: 'sign-in brand panel' },
+  { fg: 'panel-mute', bg: 'panel', note: 'sign-in brand panel, small text' },
 ]
 
 const NON_TEXT: Pair[] = [

@@ -13,11 +13,12 @@ React + TypeScript (strict), Tailwind v4, React Router, Vite, Vitest, Playwright
 ## Layout
 ```
 src/
-  pages/teacher|student|auth/   screens
+  pages/teacher|student|auth/   screens (auth: role chooser and the two sign-in pages)
+  auth/                         sign-in: AuthProvider, RequireRole, token store, login API (real + mock), messages
   components/common/            shared UI: AppShell, SideNav, Calendar, Modal, Button, Card, fields, themes card
   components/teacher|student/   role-specific pieces and layouts
-  hooks/                        TeacherData / StudentData providers, useAuth, useAction, useSidebar
-  api/                          client.ts, teacher.ts, student.ts, auth.ts, mocks/ (store, seed, actions)
+  hooks/                        TeacherData / StudentData providers, useAuth (re-export), useAction, useSidebar
+  api/                          client.ts, teacher.ts, student.ts, mocks/ (store, seed, actions, identity)
   lib/                          rules.ts (domain rules), calendar.ts, dates.ts, text.ts, theme.ts
   types/index.ts                the one source of types
 e2e/                            Playwright tests
@@ -36,7 +37,7 @@ e2e/                            Playwright tests
 - Every new endpoint goes into `docs/api-contract.md`.
 
 ## Shared files (need a PR note and a teammate review)
-`src/components/common/`, `src/api/client.ts`, `src/api/auth.ts`, `src/hooks/useAuth.ts`, `src/types/`, `src/lib/`,
+`src/components/common/`, `src/api/client.ts`, `src/auth/`, `src/hooks/useAuth.ts`, `src/types/`, `src/lib/`,
 `src/routes/`, `src/index.css`, `docs/api-contract.md`.
 
 ## Git
@@ -53,4 +54,5 @@ real login), build the Alma integration, or write backend code.
 - [ ] Put the school crest at `public/school-logo.png`
 - [x] `docs/api-contract.md` matches the current endpoints; `docs/backend-connection-report.md` lists what the backend still has to build
 - [ ] Switch from mocks to the real API
-- [ ] Real login wired to the auth team's JWT
+- [x] Sign-in: role chooser, `/student/login`, `/teacher/login`, token + `GET /auth/me` restore, route guards, 401 handling (mock accounts in mock mode)
+- [ ] Backend endpoints that check the token (so the signed-in person's own data comes back), refresh token, logout, rate limit: see "Authentication gaps" in `docs/api-contract.md`

@@ -4,7 +4,6 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addDays, toISODate } from '../../lib/dates'
 import { listSlots, checkBooking, type World } from '../../lib/rules'
 import type { Booking, TimingDraft } from '../../types'
-import { getRole, login, logout } from '../auth'
 
 vi.mock('./actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./actions')>()),
@@ -75,18 +74,16 @@ describe('example data', () => {
     expect(s.teachers).toHaveLength(6)
     expect(rivera().daysOff).toHaveLength(3)
     expect(s.requests.filter((r) => r.teacherId === ME_TEACHER && r.status === 'pending')).toHaveLength(3)
-    expect(s.notes.teacher.filter((n) => !n.read)).toHaveLength(2)
-    expect(s.notes.student.filter((n) => !n.read)).toHaveLength(1)
+    expect(s.notes[ME_TEACHER].filter((n) => !n.read)).toHaveLength(2)
+    expect(s.notes[ME_STUDENT].filter((n) => !n.read)).toHaveLength(1)
   })
 
-  it('signs in by role and keeps the role through a reset', async () => {
-    expect(getRole()).toBeNull()
-    await login('student')
-    expect(getRole()).toBe('student')
-    await resetExample()
-    expect(getRole()).toBe('student')
-    logout()
-    expect(getRole()).toBeNull()
+  it('has settings and notifications for each example account, not one shared set', () => {
+    const s = getState()
+    for (const id of ['rivera', 'okafor']) expect(s.teacherPrefs[id]).toBeDefined()
+    for (const id of ['maya', 'daniel']) expect(s.studentPrefs[id].id).toBe(id)
+    expect(s.studentPrefs.daniel.name).toBe('Daniel O.')
+    expect(s.notes.okafor.length).toBeGreaterThan(0)
   })
 })
 
@@ -279,16 +276,17 @@ describe('settings, notifications and reminders', () => {
     const s = await teacher.getSettings()
     await teacher.saveSettings({ ...s, lead: '1 day' })
     await runReminders()
-    const once = getState().notes.teacher.length + getState().notes.student.length
+    const total = () => Object.values(getState().notes).reduce((n, list) => n + list.length, 0)
+    const once = total()
     await runReminders()
-    expect(getState().notes.teacher.length + getState().notes.student.length).toBe(once)
+    expect(total()).toBe(once)
 
     resetState()
     const off = await teacher.getSettings()
     await teacher.saveSettings({ ...off, remind: false, morning: false, lead: '1 day' })
-    const before = getState().notes.teacher.length
+    const before = getState().notes[ME_TEACHER].length
     await runReminders()
-    expect(getState().notes.teacher.length).toBe(before)
+    expect(getState().notes[ME_TEACHER].length).toBe(before)
   })
 
   it('reset puts the original data back', async () => {

@@ -5,7 +5,6 @@ import type {
   BookingRequest,
   Dow,
   Note,
-  Role,
   StudentPrefs,
   Teacher,
   TeacherPrefs,
@@ -14,27 +13,32 @@ import type {
 import { addDays, formatDateLong, formatDateShort, formatTime, startOfDay, toISODate } from '../../lib/dates'
 import { DEFAULT_SEATS } from '../../lib/rules'
 
-export const STORAGE_VERSION = 2
+export const STORAGE_VERSION = 3
 
-/** The signed-in people in mock mode. */
+/** The people mock mode answers for when nobody has signed in (unit tests). In the app it is whoever signed in. */
 export const ME_TEACHER = 'rivera'
 export const ME_STUDENT = 'maya'
 
 export interface DemoState {
   version: number
-  session: Role | null
   teachers: Teacher[]
   bookings: Booking[]
   requests: BookingRequest[]
-  notes: Record<Role, Note[]>
-  teacherPrefs: TeacherPrefs
-  studentPrefs: StudentPrefs
+  /** Each person's notifications, by their id ("maya", "rivera"...). */
+  notes: Record<string, Note[]>
+  /** Each teacher's / student's email switches and reminder time, by id. A person with no entry has the defaults. */
+  teacherPrefs: Record<string, TeacherPrefs>
+  studentPrefs: Record<string, StudentPrefs>
   seq: number
 }
 
 const HOUR = 3_600_000
 
-export function seedState(now: Date, session: Role | null = null): DemoState {
+export const defaultTeacherPrefs = (): TeacherPrefs => ({ email: '', remind: true, booking: true, cancel: true, request: true, morning: false, lead: '1 hour' })
+
+export const defaultStudentPrefs = (id: string, name: string, grade = ''): StudentPrefs => ({ id, name, grade, email: '', remind: true, booked: true, answer: true, out: true, lead: '1 hour' })
+
+export function seedState(now: Date): DemoState {
   const t0 = startOfDay(now)
   let seq = 100
   const id = (prefix: string) => `${prefix}${++seq}`
@@ -182,12 +186,16 @@ export function seedState(now: Date, session: Role | null = null): DemoState {
 
   const nowMs = now.getTime()
   const note = (text: string, hoursAgo: number, read: boolean): Note => ({ id: id('n'), text, at: nowMs - hoursAgo * HOUR, read })
-  const notes: Record<Role, Note[]> = {
-    student: [
+  const notes: Record<string, Note[]> = {
+    maya: [
       note(`Ms. Alvarez is out on ${formatDateLong(al[2])}. Cancel your booking and pick another time.`, 2, false),
       note('Ms. Alvarez accepted your request for a different time.', 30, true),
     ],
-    teacher: [
+    daniel: [],
+    okafor: [
+      note(`Maya K. sent a request for ${formatDateShort(fwd([5], 1)[0])} at ${formatTime('15:45')}.`, 3, false),
+    ],
+    rivera: [
       note(`Marcus T. sent a request for ${formatDateShort(fwd([1], 1)[0])} at ${formatTime('15:30')}.`, 1, false),
       note(`Hana B. booked Lunch on ${formatDateShort(riv[1])}.`, 5, false),
       note(`Sofia L. sent a request for ${formatDateShort(fwd([5], 1)[0])} at ${formatTime('12:15')}.`, 26, true),
@@ -196,13 +204,15 @@ export function seedState(now: Date, session: Role | null = null): DemoState {
 
   return {
     version: STORAGE_VERSION,
-    session,
     teachers,
     bookings,
     requests,
     notes,
-    teacherPrefs: { email: '', remind: true, booking: true, cancel: true, request: true, morning: false, lead: '1 hour' },
-    studentPrefs: { id: ME_STUDENT, name: 'Maya K.', grade: 'Grade 10', email: '', remind: true, booked: true, answer: true, out: true, lead: '1 hour' },
+    teacherPrefs: Object.fromEntries(teachers.map((t) => [t.id, defaultTeacherPrefs()])),
+    studentPrefs: {
+      maya: defaultStudentPrefs('maya', 'Maya K.', 'Grade 10'),
+      daniel: defaultStudentPrefs('daniel', 'Daniel O.', 'Grade 10'),
+    },
     seq,
   }
 }
@@ -217,10 +227,12 @@ export function isDemoState(x: unknown): x is DemoState {
     Array.isArray(s.bookings) &&
     Array.isArray(s.requests) &&
     !!s.notes &&
-    Array.isArray(s.notes.student) &&
-    Array.isArray(s.notes.teacher) &&
+    Array.isArray(s.notes.maya) &&
+    Array.isArray(s.notes.rivera) &&
     !!s.teacherPrefs &&
+    !!s.teacherPrefs.rivera &&
     !!s.studentPrefs &&
+    !!s.studentPrefs.maya &&
     typeof s.seq === 'number'
   )
 }

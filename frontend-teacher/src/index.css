@@ -46,6 +46,11 @@
   --side-accent: #e8782f;
   --logo-ring: #ffffff;
 
+  /* The sign-in brand panel is always deep navy, whatever palette or light / dark is chosen. */
+  --panel: #0f2440;
+  --panel-ink: #ffffff;
+  --panel-mute: #b9c8da;
+
   /* Status colors never change with the palette. Open seats use --tint; full / day off use the pale orange tint; past is grey. */
   --amber: #fbebd3;
   --amber-ink: #7a4a0b;
@@ -207,6 +212,9 @@
   --color-side-line: var(--side-line);
   --color-side-accent: var(--side-accent);
   --color-logo-ring: var(--logo-ring);
+  --color-panel: var(--panel);
+  --color-panel-ink: var(--panel-ink);
+  --color-panel-mute: var(--panel-mute);
 
   --color-amber: var(--amber);
   --color-amber-ink: var(--amber-ink);

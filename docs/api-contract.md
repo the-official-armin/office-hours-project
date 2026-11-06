@@ -53,9 +53,11 @@ exception handler that produces this shape (including for request-validation err
 | `conflict` | 409 | The student has another booking that overlaps in time, with any teacher |
 | `duplicate_day_off` | 409 | That date is already a day off |
 | `seat_floor` | 409 | Seats per office hour cannot drop below the number of students booked in the fullest upcoming office hour |
+| `invalid_credentials` | 401 | Sign in failed: unknown role, user ID or password. One answer for all three, so it never says which was wrong |
+| `unauthorized` | 401 | No bearer token, or it is invalid or expired, or its user no longer exists |
 
-Also: `401` when there is no valid token, `403` when the role is wrong (a student calling `/teacher/...`). These two may
-use the same body with `code: "invalid"` until the frontend adds codes for them.
+Also: `403` when the role is wrong (a student calling `/teacher/...`). The frontend has no special code for it yet; any other
+body is shown as `message`. A `422` with FastAPI's own `detail` is what a malformed request body gets.
 
 ## 2. Limits and constants
 
@@ -101,22 +103,45 @@ type StudentSettings = StudentPrefs
 interface Note { id: string; text: string; at: number /* epoch ms */; read: boolean; key?: string }
 interface TimingDraft { id: string; name: string; start: string; end: string; days: Dow[] }
 interface HoursInput { timings: TimingDraft[]; max: number }
+/** The signed-in person, as GET /auth/me answers it. */
+interface AuthUser { id: string; name: string; role: Role }
 /** What the student calendar fetches for a date range: this student's own bookings and requests, all teachers. */
 interface CalendarData { bookings: Booking[]; requests: BookingRequest[] }
 ```
 
-## 4. Authentication (not in `src/api/` yet)
+## 4. Authentication (`src/auth/`)
 
-The frontend's sign-in is a placeholder (`src/api/auth.ts`). The auth team owns the real one. The frontend needs:
+Matches `backend/README.md` and `backend/app/routers/auth.py` (backend PR #15). People sign in with a **role**, a **user ID**
+(the same id the rest of the API uses: `maya`, `rivera`) and a **password**.
 
 | Method | Path | Request | Response | Errors |
 | --- | --- | --- | --- | --- |
-| POST | `/auth/login` | `{ "email": string, "password": string }` | `{ "accessToken": string, "tokenType": "bearer", "expiresIn": number, "user": { "id": string, "name": string, "role": "student" \| "teacher" } }` | `401 invalid` |
-| GET | `/auth/me` | none | `{ "id", "name", "role" }` | `401` |
+| POST | `/auth/login` | `{ "role": "student" \| "teacher", "userId": string, "password": string }` | `200` `{ "accessToken": string, "tokenType": "bearer", "expiresIn": number (seconds), "user": { "id", "role", "name" } }` | `401 invalid_credentials` (wrong password, unknown ID, or the ID is from the other role: one answer for all three); `422` for a malformed body |
+| GET | `/auth/me` | header `Authorization: Bearer <accessToken>` | `200` `{ "id", "role", "name" }` | `401 unauthorized` |
 
-Notes: hash passwords (the table already stores `hashed_password`); the token carries the user id and role; an expired
-token answers `401` and the frontend sends the person to `/login`. **Todo on the frontend:** `src/api/client.ts` does not
-attach the token yet; add it when this lands. `admin` exists in the database but has no screens yet.
+**What the frontend does with it**
+
+- `/login` asks "I'm a student / I'm a teacher". `/student/login` and `/teacher/login` share one form (User ID, Password, "Keep me signed in").
+  The page picks the `role` it sends. There is no sign-up page: the school creates accounts.
+- After `POST /auth/login` the token is kept in `sessionStorage` (gone when the tab closes), or in `localStorage` when "Keep me signed in"
+  is ticked. On start the app calls `GET /auth/me` with the saved token and shows a spinner meanwhile, so the login page never flashes.
+  A token past its `expiresIn` is never sent.
+- Every other request carries `Authorization: Bearer <token>` (`src/api/client.ts`).
+- **A `401` on any request means the session ended.** The frontend forgets the token and goes to that role's sign-in with
+  `?next=<the page>&reason=expired` and the note "Your session ended. Sign in again." After signing in it returns to `next`, but only
+  when it is an app path (`/...`, not `//`, not a full URL) that belongs to the signed-in role. Otherwise it opens that role's home.
+- A signed-in person who opens a page of the other role goes to their own home with the note "That page is for teachers" (or students).
+- **Log out is client-side** (the backend has no logout endpoint): the token is forgotten and the person sees "Signed out".
+- A `403` is not treated as "session ended": the token is fine, the role is wrong.
+
+**What every other endpoint must do** (the next backend step; today the backend still answers as the demo user when no token is sent):
+`401 unauthorized` when the bearer token is missing, invalid or expired; `403` when the token's role is not allowed (a student on
+`/teacher/...`); and the identity (`teacher.id`, `student.id`) always comes from the token's `sub`, never from the request.
+
+**Mock mode** (`VITE_USE_MOCKS=true`) behaves the same way: accounts `maya`, `daniel` (students) and `rivera`, `okafor` (teachers), password
+`demo-password` (the backend's demo seed password), a 400 ms delay, `401 invalid_credentials` for anything wrong, and tokens that last 60
+minutes. The sign-in page shows a "Demo accounts" box (click to fill) only in mock mode. Each account has its own notifications and
+settings, so two students can be signed in at once in two tabs.
 
 ## 5. Teacher endpoints (`src/api/teacher.ts`)
 
@@ -370,8 +395,35 @@ The frontend works without these today. Each one would remove a workaround.
 
 | Wanted from the backend | Why | What the frontend does until then |
 | --- | --- | --- |
-| `createdAt` (ISO 8601) on every `Booking` | The teacher lists students in the order they booked | `createdAt` is optional in `Booking`. Without it, bookings are ordered by `id` (numbers compare as numbers), which is the order the backend creates them in |
+| ~~`createdAt` (ISO 8601) on every `Booking`~~ **Done** on `origin/main` (`0391a7f`, `null` allowed) | The teacher lists students in the order they booked | `createdAt` stays optional in `Booking`. When it is missing or `null`, bookings are ordered by `id` (numbers compare as numbers), which is the order the backend creates them in |
 | A date-range query on the student lists, for example `GET /bookings?view=student&from=&to=` and `GET /requests?view=student&from=&to=` | The My calendar page needs only a week, month or quarter | It fetches the whole `view=student` lists and cuts them to the range in the browser (`calendarInRange`). Fine for one school year, wasteful beyond that |
+
+### Authentication gaps
+
+What the frontend would like added to the auth in `backend/app/routers/auth.py`. None of it blocks sign-in today.
+
+| Wanted from the backend | Why | What the frontend does until then |
+| --- | --- | --- |
+| **Endpoints check the token** (`current_teacher` / `current_student` read `Authorization: Bearer`, `401` without or with a bad one, `403` for the wrong role), then drop `ME_TEACHER_ID` / `ME_STUDENT_ID` | Today every endpoint answers as `rivera` / `maya` whoever signed in, so signing in only changes the name on screen | It already sends the token on every request and ends the session on a `401` |
+| A **refresh token** (rotated, stored hashed, 7 to 30 days, revoked on logout) in an `httpOnly` cookie, plus `POST /auth/refresh` -> `{ accessToken, expiresIn }` | The access token lasts 60 minutes (`JWT_EXPIRE_MINUTES`). Without a refresh, people are signed out hourly, and the frontend must keep the access token in `sessionStorage` / `localStorage`, where a script injected into the page could read it | The token is kept in `sessionStorage` (or `localStorage` with "Keep me signed in"). After a `401` the person signs in again |
+| `POST /auth/logout` -> `204` (revokes the refresh token) | A real log out | Log out forgets the token in the browser only; the token stays valid until it expires |
+| **Rate limit** on `POST /auth/login`, per account and per IP, answering `429` | Stops password guessing | It shows "Too many tries. Wait a few minutes and try again." for a `429`, but nothing sends one yet |
+| A distinct answer for the right ID on the wrong side, for example `403 WRONG_ROLE` ("This is a student account. Use student sign in.") | Friendlier than a blind "incorrect" | It shows the same "User ID or password is incorrect." for every login failure. Never saying which part was wrong is also the safe default |
+| **CORS limited to the frontend's origin** (not `*`). With a refresh cookie it also needs `allow_credentials=True` with that exact origin | `allow_origins=["*"]` with credentials is rejected by browsers, and `*` lets any site call the API from a signed-in browser | The frontend sends no cookies today, so `*` works for now |
+| **`JWT_SECRET` set to a long random value** in every deployed environment (the code has a development default) | A known secret lets anyone mint tokens for any user | Not applicable (backend setting) |
+| Real passwords, not `demo-password`; **no public sign-up** (accounts created by the school) | The demo seed gives every account the same password | There is no sign-up page |
+| `GET /auth/me` could also return the fields the sidebar shows (`subject` for a teacher, `grade` for a student) | The profile is read again from `/teacher/settings` and `/student/settings` after sign-in | It shows what the settings endpoints return |
+
+### User fields: frontend vs the backend's tables
+
+| Frontend field | Backend column | Note |
+| --- | --- | --- |
+| `AuthUser.id` ("maya", "rivera") | `students.id` / `teachers.id` (String primary key) | Used as the sign-in **user ID**. There is no separate login name |
+| `AuthUser.name` | `students.name` / `teachers.name` | Returned by `/auth/login` and `/auth/me` |
+| `AuthUser.role` | none. The role is which table the ID was found in (`role` in the login body picks the table) | So the same ID could exist as a student and a teacher; IDs must stay unique across both tables |
+| Password | `students.password_hash` / `teachers.password_hash` (scrypt, `0002_add_authentication`) | Never sent back. Not editable in the app yet ("Change password" shows a note) |
+| `StudentSettings.email` / `TeacherSettings.email` | `students.email` / `teachers.email` (default `""`) | Only the address for reminder emails. It is **not** a login name, which is why sign-in uses the user ID and not an email |
+| `grade` (`StudentPrefs`), `subject` (`TeacherSettings`) | `students.grade`, `teachers.subject` | Shown in the sidebar from the settings endpoints, not from `/auth/me` |
 
 ## Not in this contract
 - Student booking is the Student screens in this same app; there is no separate student app.
