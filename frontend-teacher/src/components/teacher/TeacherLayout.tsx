@@ -1,6 +1,5 @@
 // Owner: Subgroup B (Teacher desktop UI). Teacher side of the app: loads Teacher data, then renders the shared AppShell.
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { TeacherDataProvider, toTeacherShell, useTeacher } from '../../hooks/TeacherData'
 import { useAuth } from '../../hooks/useAuth'
 import AppShell from '../common/AppShell'
@@ -9,7 +8,6 @@ import Button from '../common/Button'
 function Shell() {
   const t = useTeacher()
   const { logout } = useAuth()
-  const navigate = useNavigate()
   const [pageKey, setPageKey] = useState(0)
 
   if (t.status === 'error' || (t.status === 'ready' && !t.data)) {
@@ -44,10 +42,7 @@ function Shell() {
         await t.resetExample()
         setPageKey((k) => k + 1)
       }}
-      onLogout={() => {
-        logout()
-        navigate('/login', { replace: true })
-      }}
+      onLogout={logout}
       pageKey={pageKey}
     />
   )

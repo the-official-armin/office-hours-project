@@ -29,7 +29,9 @@ To check the app on any day, run the tests with a fixed date: `$env:VITE_TEST_NO
   `/teacher/requests?tab=requests|bookings`, `/teacher/settings`
 - Student: `/student` (Home), `/student/calendar` (My calendar), `/student/teachers`, `/student/teachers/:teacherId?day=YYYY-MM-DD`,
   `/student/bookings?tab=up|past|req`, `/student/settings`
-- `/login` is a placeholder sign-in (pick a side). Real login belongs to the auth team.
+- Sign in: `/login` (student or teacher), `/student/login`, `/teacher/login`. Everything else needs a signed-in person of the right role.
+  In mock mode sign in as `maya` or `daniel` (students) or `rivera` or `okafor` (teachers) with the password `demo-password`;
+  the sign-in page lists them. In real mode it uses the backend's `POST /auth/login` and `GET /auth/me`.
 
 ## Themes
 
@@ -65,10 +67,11 @@ Put the crest at `public/school-logo.png` (square PNG, 256x256 or more). Until i
 
 1. Copy `.env.example` to `.env.local`: `VITE_USE_MOCKS=false` and `VITE_API_URL=http://localhost:8000`.
 2. Make the backend match `docs/api-contract.md` (the endpoints `src/api/teacher.ts` and `student.ts` call).
-3. Replace the placeholder login: `src/api/auth.ts`, `src/hooks/useAuth.ts`, `src/pages/auth/Login.tsx`.
+3. Sign in with the backend's user IDs and passwords (the demo seed uses `demo-password`). Sign-in lives in `src/auth/`; see
+   section 4 of `docs/api-contract.md` for what it sends and what the backend still has to add.
 
 ## Ownership
 
 Everything in `frontend-teacher/` is built by Subgroup B. Shared files need a PR note and a teammate review:
-`src/components/common/`, `src/api/client.ts`, `src/api/auth.ts`, `src/hooks/useAuth.ts`, `src/types/`, `src/lib/`,
+`src/components/common/`, `src/api/client.ts`, `src/auth/`, `src/hooks/useAuth.ts`, `src/types/`, `src/lib/`,
 `src/routes/`, `src/index.css`, `docs/api-contract.md`.

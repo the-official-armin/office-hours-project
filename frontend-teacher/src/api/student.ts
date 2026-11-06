@@ -2,6 +2,7 @@
 // VITE_USE_MOCKS=true (default) answers from the local mock store; false calls the real backend.
 // Paths follow backend/README.md (the source of truth). The backend enforces every rule in src/lib/rules.ts.
 import type { Booking, BookingRequest, CalendarData, Note, StudentSettings, Teacher } from '../types'
+import { guardMock } from '../auth/guardMock'
 import { calendarInRange } from '../lib/studentCalendar'
 import { USE_MOCKS, request } from './client'
 import { mockStudentApi, type BookSpotInput, type SendRequestInput } from './mocks/mockStudent'
@@ -54,4 +55,4 @@ export const realStudentApi: StudentApi = {
   markNotesRead: () => request('/notifications/read-all?view=student', { method: 'POST' }),
 }
 
-export const studentApi: StudentApi = USE_MOCKS ? mockStudentApi : realStudentApi
+export const studentApi: StudentApi = USE_MOCKS ? guardMock(mockStudentApi) : realStudentApi

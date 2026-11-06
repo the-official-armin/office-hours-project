@@ -19,15 +19,15 @@ Run live in a browser against a copy of the backend (SQLite), as the demo studen
 
 ## Needs the backend team
 
-- [ ] **Concurrent requests break the SQLite setup.** `backend/app/database.py` uses `StaticPool` for every SQLite URL, which
-  shares one connection between all request threads. The frontend sends about six requests at once when a page opens, and
-  the backend then answers some with `500` (`sqlite3.InterfaceError: bad parameter or other API misuse`) and some with a
-  wrong `404 not_found` (`db.get(Teacher, ...)` returns nothing). One request at a time (curl, the tests) always works,
-  which is why it was missed. Suggested fix: use `StaticPool` only when the URL is `:memory:`, and the default pool with
-  `check_same_thread=False` for a SQLite file. Confirmed by changing exactly that line in a scratch copy: every error went away.
-  Not changed in `backend/`.
-- [ ] **JWT.** Every request is answered as `rivera` / `maya` (`ME_TEACHER_ID`, `ME_STUDENT_ID`). The frontend's sign-in is a
-  placeholder until the auth team lands real login (`POST /auth/login`, `GET /auth/me`, `Authorization: Bearer`).
+- [x] **Concurrent requests broke the SQLite setup.** Fixed on `origin/main` (`0391a7f`): `StaticPool` is now used only for in-memory
+  databases. It was a shared connection between all request threads, so the six requests the frontend sends when a page opens
+  gave `500` (`sqlite3.InterfaceError`) or a wrong `404 not_found`. Checked again with the real-mode frontend against `origin/main`:
+  no `404` or `500` in the backend log.
+- [ ] **Make the endpoints check the token.** `POST /auth/login` and `GET /auth/me` work and the frontend signs in with them (user ID +
+  password, token kept in the browser, sent as `Authorization: Bearer`, a `401` sends the person back to sign in). But every other
+  endpoint still answers as `rivera` / `maya` (`ME_TEACHER_ID`, `ME_STUDENT_ID`) whoever signed in. `current_teacher` and
+  `current_student` need to read the token (`401` without or with a bad one, `403` for the wrong role). The rest of the auth wish list
+  (refresh token, logout, login rate limit, CORS origin, `JWT_SECRET`) is in "Authentication gaps" in `api-contract.md`.
 - [ ] **Backend tests use today's date.** `test_book_happy_path`, `test_book_full`, `test_book_already_booked` and
   `test_cancel_booking_flow` failed with `already_booked` on some days, because the demo data is built from the current
   date and the tests pick a slot that is already booked. A test bug, not an API bug.
@@ -39,7 +39,7 @@ Run live in a browser against a copy of the backend (SQLite), as the demo studen
 
 ## Nice to have (the frontend works without them)
 
-- [ ] `createdAt` on every booking. Until then students are listed by booking `id`.
+- [x] `createdAt` on every booking. Done on `origin/main` (`0391a7f`); it can be `null`, and the frontend then falls back to the id.
 - [ ] A date-range query on `GET /bookings?view=student` and `GET /requests?view=student` (for example `from` and `to`). Until
   then My calendar fetches both whole lists and cuts them to the visible range in the browser.
 

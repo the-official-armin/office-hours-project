@@ -1,16 +1,11 @@
 // The phone layout at 390px: no sideways scroll, the tab bar instead of the sidebar, and tap targets of at least 44px.
 import { expect, test, type Page } from '@playwright/test'
+import { signIn } from './helpers'
 
 test.use({ viewport: { width: 390, height: 844 } })
 
 const TEACHER = ['', '/calendar', '/office-hours', '/days-off', '/requests?tab=requests', '/requests?tab=bookings', '/settings']
 const STUDENT = ['', '/calendar', '/teachers', '/teachers/rivera', '/bookings?tab=up', '/bookings?tab=past', '/bookings?tab=req', '/settings']
-
-async function signIn(page: Page, role: 'teacher' | 'student') {
-  await page.goto('/login')
-  await page.getByRole('button', { name: new RegExp(role, 'i') }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-}
 
 /** Interactive elements whose tap area is under 44px tall. A switch extends its hit area; a label counts as its input. */
 async function smallTargets(page: Page): Promise<string[]> {

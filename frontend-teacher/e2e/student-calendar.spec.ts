@@ -1,11 +1,6 @@
 // The student calendar (all teachers) and booking a spot without choosing a seat.
 import { expect, test, type Page } from '@playwright/test'
-
-async function signIn(page: Page, role: 'teacher' | 'student') {
-  await page.goto('/login')
-  await page.getByRole('button', { name: new RegExp(role, 'i') }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-}
+import { isoDay, signIn } from './helpers'
 
 const scale = (page: Page, name: 'Week' | 'Month' | 'Quarter') =>
   page.getByRole('group', { name: 'Calendar scale' }).getByRole('button', { name, exact: true })
@@ -182,8 +177,7 @@ test.describe('booking a spot, not a seat', () => {
     await expect(page.getByRole('heading', { name: /You.re booked/ })).toBeVisible()
 
     await page.locator('#side').getByRole('button', { name: 'Log out' }).click()
-    await page.getByRole('button', { name: /teacher/i }).click()
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await signIn(page, 'teacher')
     await page.goto('/teacher/requests?tab=bookings')
     const text = await page.locator('main').innerText()
     expect(text).toContain('Maya K.')
@@ -192,51 +186,55 @@ test.describe('booking a spot, not a seat', () => {
   })
 
   test('if the office hour fills up while the form is open, the card says so and nothing is booked', async ({ browser }) => {
+    // Two real students in one browser: maya and daniel are signed in in separate tabs (the token lives in each tab's sessionStorage)
+    // while the example data is shared. Maya has the reason form open on the last spot, Daniel takes it, then Maya confirms.
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
     const a = await context.newPage()
-    await signIn(a, 'student')
-    await a.goto('/student/teachers/rivera')
-
-    // Open the reason form on an office hour that has room.
-    await a.getByRole('button', { name: 'Book a spot', exact: true }).and(a.locator(':enabled')).first().click()
-    await a.getByLabel('What do you want help with?').fill('Help with the graphing project')
-
-    // Meanwhile other students take every remaining spot. A second tab shares the same store.
     const b = await context.newPage()
-    await b.goto('/login')
-    await b.evaluate(() => {
-      const key = 'officehours.demo.v2'
+    await signIn(a, 'student', 'maya')
+    await signIn(b, 'student', 'daniel')
+
+    // The second Tuesday or Thursday from tomorrow: no day off, nothing booked after school, and nobody clashes.
+    const days: string[] = []
+    for (let i = 1; days.length < 2; i++) {
+      const d = new Date()
+      d.setDate(d.getDate() + i)
+      if ([2, 4].includes(d.getDay())) days.push(isoDay(i))
+    }
+    const day = days[1]
+
+    // Other classmates take all but one of Ms. Rivera's after-school spots that day.
+    await b.evaluate((date) => {
+      const key = 'officehours.demo.v3'
       const state = JSON.parse(localStorage.getItem(key)!)
-      // The office hour whose form is open is the first bookable one on the page: fill that day's office hours of Rivera.
-      const today = new Date()
-      const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       const rivera = state.teachers.find((t: { id: string }) => t.id === 'rivera')
-      for (let i = 0; i < 40; i++) {
-        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)
-        const date = iso(d)
-        for (const timing of rivera.timings) {
-          if (!timing.days.includes(d.getDay())) continue
-          const held = state.bookings.filter(
-            (x: { teacherId: string; date: string; timingId: string; status: string }) =>
-              x.teacherId === 'rivera' && x.date === date && x.timingId === timing.id && x.status === 'confirmed',
-          ).length
-          for (let n = held; n < rivera.max; n++) {
-            state.seq += 1
-            state.bookings.push({
-              id: `race${state.seq}`, teacherId: 'rivera', date, timingId: timing.id, studentId: `other${state.seq}`,
-              studentName: 'Someone', reason: 'Needs help', status: 'confirmed', createdAt: new Date().toISOString(),
-            })
-          }
-        }
+      const held = state.bookings.filter((x: { teacherId: string; date: string; timingId: string; status: string }) => x.teacherId === 'rivera' && x.date === date && x.timingId === 'after' && x.status === 'confirmed').length
+      for (let n = held; n < rivera.max - 1; n++) {
+        state.seq += 1
+        state.bookings.push({ id: `fill${state.seq}`, teacherId: 'rivera', date, timingId: 'after', studentId: `kid${state.seq}`, studentName: 'Classmate', reason: 'Needs help', status: 'confirmed', createdAt: new Date().toISOString() })
       }
       localStorage.setItem(key, JSON.stringify(state))
-    })
-    await b.close()
+    }, day)
 
+    // Maya opens the form on the last spot and types her reason.
+    await a.goto(`/student/teachers/rivera?day=${day}`)
+    const mayaCard = a.getByLabel('After school office hour')
+    await expect(mayaCard.getByText(/3 of 4 spots taken/)).toBeVisible()
+    await mayaCard.getByRole('button', { name: 'Book a spot', exact: true }).click()
+    await a.getByLabel('What do you want help with?').fill('Help with the graphing project')
+
+    // Daniel books the last spot first.
+    await b.goto(`/student/teachers/rivera?day=${day}`)
+    await b.getByLabel('After school office hour').getByRole('button', { name: 'Book a spot', exact: true }).click()
+    await b.getByLabel('What do you want help with?').fill('Lab report questions for the quiz')
+    await b.getByRole('button', { name: 'Confirm booking' }).click()
+    await expect(b.getByRole('heading', { name: /You.re booked/ })).toBeVisible()
+
+    // Maya confirms: it just filled up, nothing is booked, and what she typed is still there.
     await a.getByRole('button', { name: 'Confirm booking' }).click()
     await expect(a.getByText('That office hour just filled up.')).toBeVisible()
-    await expect(a.getByRole('button', { name: 'Full', exact: true }).first()).toBeVisible()
     await expect(a.getByRole('heading', { name: /You.re booked/ })).toHaveCount(0)
+    await expect(a.getByLabel('After school office hour').getByRole('button', { name: 'Full', exact: true })).toBeVisible()
     await context.close()
   })
 })

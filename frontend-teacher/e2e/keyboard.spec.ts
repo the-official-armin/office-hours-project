@@ -1,11 +1,6 @@
 // Keyboard-only behavior: dialogs, the notification popover, the sidebar shortcut, booking a spot, the theme picker.
 import { expect, test, type Page } from '@playwright/test'
-
-async function signIn(page: Page, role: 'teacher' | 'student') {
-  await page.goto('/login')
-  await page.getByRole('button', { name: new RegExp(role, 'i') }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-}
+import { signIn } from './helpers'
 
 test('a dialog traps focus, closes with Esc and returns focus to its opener', async ({ page }) => {
   await signIn(page, 'teacher')

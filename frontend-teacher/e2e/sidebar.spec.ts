@@ -1,12 +1,11 @@
 // The sidebar footer (profile + Log out) must stay put while the page scrolls, even when the nav tree is taller than
 // the screen, and after the sidebar is collapsed and reopened.
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { signIn } from './helpers'
 
 async function signInAsTeacher(page: Page) {
-  await page.goto('/login')
-  await page.getByRole('button', { name: /teacher/i }).click()
+  await signIn(page, 'teacher')
   await expect(page.locator('#side')).toBeVisible()
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
 }
 
 const logOut = (page: Page): Locator => page.locator('#side').getByRole('button', { name: 'Log out' })

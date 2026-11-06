@@ -10,6 +10,7 @@ import type {
   Teacher,
   TeacherSettings,
 } from '../types'
+import { guardMock } from '../auth/guardMock'
 import { USE_MOCKS, request } from './client'
 import { mockTeacherApi } from './mocks/mockTeacher'
 
@@ -49,6 +50,6 @@ export const realTeacherApi: TeacherApi = {
   markNotesRead: () => request('/notifications/read-all?view=teacher', { method: 'POST' }),
 }
 
-export const teacherApi: TeacherApi = USE_MOCKS ? mockTeacherApi : realTeacherApi
+export const teacherApi: TeacherApi = USE_MOCKS ? guardMock(mockTeacherApi) : realTeacherApi
 
 export { USE_MOCKS }

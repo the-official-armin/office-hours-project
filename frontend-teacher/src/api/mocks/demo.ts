@@ -2,8 +2,8 @@
 // A real backend has no equivalent: the server sends reminders, and there is no "example data".
 import { addDays, combine, formatTime, toISODate } from '../../lib/dates'
 import { isOff, LEAD_MINUTES, slotRows, disruption, timingOf, upcomingBookings } from '../../lib/rules'
-import { delay, pushNote, worldOf } from './actions'
-import { ME_STUDENT, ME_TEACHER } from './seed'
+import { delay, pushNote, studentPrefsOf, teacherPrefsOf, worldOf } from './actions'
+import { meStudent, meTeacher } from './identity'
 import { mutate, resetState } from './store'
 
 /**
@@ -14,11 +14,13 @@ export async function runReminders(now: Date = new Date()): Promise<void> {
   mutate((d) => {
     const w = worldOf(d)
     const today = toISODate(now)
-    const teacher = w.teachers.find((t) => t.id === ME_TEACHER)
+    const teacher = w.teachers.find((t) => t.id === meTeacher())
+    const tPrefs = teacherPrefsOf(d, meTeacher())
+    const sPrefs = studentPrefsOf(d, meStudent())
     const minutesUntil = (date: string, start: string) => (combine(date, start).getTime() - now.getTime()) / 60_000
 
     if (teacher) {
-      const lead = LEAD_MINUTES[d.teacherPrefs.lead]
+      const lead = LEAD_MINUTES[tPrefs.lead]
       let todayRows = 0
       let todaySeats = 0
       for (let i = 0; i < 3; i++) {
@@ -34,10 +36,10 @@ export async function runReminders(now: Date = new Date()): Promise<void> {
           if (wait > 0 && wait <= lead) {
             pushNote(
               d,
-              'teacher',
+              teacher.id,
               `${row.timing.name} starts at ${formatTime(row.timing.start)} with ${row.taken} student${row.taken === 1 ? '' : 's'} booked.`,
-              d.teacherPrefs.remind,
-              `reminder:${teacher.id}:${date}:${row.timing.id}:${d.teacherPrefs.lead}`,
+              tPrefs.remind,
+              `reminder:${teacher.id}:${date}:${row.timing.id}:${tPrefs.lead}`,
             )
           }
         }
@@ -45,16 +47,16 @@ export async function runReminders(now: Date = new Date()): Promise<void> {
       if (todayRows > 0) {
         pushNote(
           d,
-          'teacher',
+          teacher.id,
           `Today: ${todayRows} office hour${todayRows === 1 ? '' : 's'} still to come, ${todaySeats} student${todaySeats === 1 ? '' : 's'} booked.`,
-          d.teacherPrefs.morning,
+          tPrefs.morning,
           `morning:${today}`,
         )
       }
     }
 
-    const lead = LEAD_MINUTES[d.studentPrefs.lead]
-    for (const b of upcomingBookings(w, (x) => x.studentId === ME_STUDENT, now)) {
+    const lead = LEAD_MINUTES[sPrefs.lead]
+    for (const b of upcomingBookings(w, (x) => x.studentId === meStudent(), now)) {
       const x = timingOf(w, b)
       const t = w.teachers.find((y) => y.id === b.teacherId)
       if (!x || !t || disruption(w, b)) continue
@@ -62,10 +64,10 @@ export async function runReminders(now: Date = new Date()): Promise<void> {
       if (wait <= 0 || wait > lead) continue
       pushNote(
         d,
-        'student',
+        b.studentId,
         `Reminder: ${t.name}’s ${x.name} starts at ${formatTime(x.start)}. You are booked.`,
-        d.studentPrefs.remind,
-        `reminder:${b.id}:${d.studentPrefs.lead}`,
+        sPrefs.remind,
+        `reminder:${b.id}:${sPrefs.lead}`,
       )
     }
   })

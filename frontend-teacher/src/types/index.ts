@@ -4,6 +4,13 @@
 
 export type Role = 'student' | 'teacher'
 
+/** The signed-in person, as GET /auth/me answers it. */
+export interface AuthUser {
+  id: string
+  name: string
+  role: Role
+}
+
 /** Weekday as JavaScript numbers it: 1 = Monday ... 5 = Friday. */
 export type Dow = 1 | 2 | 3 | 4 | 5
 
@@ -47,7 +54,7 @@ export interface Booking {
   studentName: string
   reason: string
   status: BookingStatus
-  /** When the booking was made (ISO). Optional: the backend does not send it yet, and then bookings are ordered by id. */
+  /** When the booking was made (ISO). Optional: it can be missing or null, and then bookings are ordered by id. */
   createdAt?: string
 }
 
@@ -151,6 +158,8 @@ export type RuleCode =
   | 'reason'
   | 'duplicate_day_off'
   | 'seat_floor'
+  | 'unauthorized'
+  | 'invalid_credentials'
 
 /** What the app shell (sidebar, top bar, tab bar) shows. */
 export interface ShellData {

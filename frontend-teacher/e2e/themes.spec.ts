@@ -1,11 +1,6 @@
 // Themes: palette and Light / Dark / System apply at once, persist, and System follows the operating system live.
 import { expect, test, type Page } from '@playwright/test'
-
-async function signIn(page: Page, role: 'teacher' | 'student') {
-  await page.goto('/login')
-  await page.getByRole('button', { name: new RegExp(role, 'i') }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-}
+import { signIn } from './helpers'
 
 const html = (page: Page) => page.locator('html')
 const sidebarColor = (page: Page) => page.locator('#side').evaluate((el) => getComputedStyle(el).backgroundColor)

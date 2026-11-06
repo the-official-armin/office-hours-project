@@ -1,6 +1,5 @@
 // Student side of the app: loads Student data, then renders the shared AppShell.
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { StudentDataProvider, toStudentShell, useStudent } from '../../hooks/StudentData'
 import { useAuth } from '../../hooks/useAuth'
 import AppShell from '../common/AppShell'
@@ -8,7 +7,6 @@ import AppShell from '../common/AppShell'
 function Shell() {
   const s = useStudent()
   const { logout } = useAuth()
-  const navigate = useNavigate()
   const [pageKey, setPageKey] = useState(0)
 
   if (s.status === 'error' || (s.status === 'ready' && !s.data)) {
@@ -47,10 +45,7 @@ function Shell() {
         await s.resetExample()
         setPageKey((k) => k + 1)
       }}
-      onLogout={() => {
-        logout()
-        navigate('/login', { replace: true })
-      }}
+      onLogout={logout}
       pageKey={pageKey}
     />
   )

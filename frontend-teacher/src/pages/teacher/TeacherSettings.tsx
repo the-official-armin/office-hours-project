@@ -1,7 +1,7 @@
 // Owner: Subgroup B (Teacher desktop UI). Purpose: profile, which emails the teacher gets (simulated in the MVP),
 // when the reminder is sent, a preview of the reminder, and the account actions.
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import Card, { CardTitle } from '../../components/common/Card'
 import { ErrorText, Field, TextInput } from '../../components/common/fields'
@@ -32,7 +32,6 @@ export default function TeacherSettings() {
   const { data, now, saveSettings } = useTeacherData()
   const { run, error, isPending } = useAction()
   const { logout } = useAuth()
-  const navigate = useNavigate()
   const toast = useToast()
   const s = data.settings
 
@@ -117,10 +116,7 @@ export default function TeacherSettings() {
               <Button onClick={() => toast('Changing a password isn’t part of this preview.')}>Change password</Button>
               <Button
                 variant="danger"
-                onClick={() => {
-                  logout()
-                  navigate('/login', { replace: true })
-                }}
+                onClick={logout}
               >
                 Log out
               </Button>
