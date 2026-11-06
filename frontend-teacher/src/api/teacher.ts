@@ -1,6 +1,6 @@
 // Owner: Subgroup B (Teacher desktop UI). The ONLY way Teacher pages reach data.
 // VITE_USE_MOCKS=true (default) answers from the local mock store; false calls the real backend.
-// Endpoints are PROPOSED: see docs/api-contract.md. The backend enforces every rule in src/lib/rules.ts.
+// Paths follow backend/README.md (the source of truth). The backend enforces every rule in src/lib/rules.ts.
 import type {
   Booking,
   BookingRequest,
@@ -34,19 +34,19 @@ export interface TeacherApi {
 
 const body = (value: unknown): RequestInit => ({ body: JSON.stringify(value) })
 
-const realTeacherApi: TeacherApi = {
-  getTeacher: () => request('/teacher/me'),
+// Shared resources take ?view=teacher; teacher-only things (profile, settings, schedule, days off) sit under /teacher.
+export const realTeacherApi: TeacherApi = {
+  getTeacher: () => request('/teacher/profile'),
   getSettings: () => request('/teacher/settings'),
   saveSettings: (input) => request('/teacher/settings', { method: 'PUT', ...body(input) }),
-  getBookings: () => request('/teacher/bookings'),
-  getRequests: () => request('/teacher/requests'),
-  saveHours: (input) => request('/teacher/office-hours', { method: 'PUT', ...body(input) }),
+  getBookings: () => request('/bookings?view=teacher'),
+  getRequests: () => request('/requests?view=teacher'),
+  saveHours: (input) => request('/teacher/schedule', { method: 'PUT', ...body(input) }),
   addDayOff: (input) => request('/teacher/days-off', { method: 'POST', ...body(input) }),
   removeDayOff: (date) => request(`/teacher/days-off/${date}`, { method: 'DELETE' }),
-  answerRequest: (id, answer) =>
-    request(`/teacher/requests/${id}/${answer === 'accepted' ? 'accept' : 'decline'}`, { method: 'POST' }),
-  getNotes: () => request('/teacher/notifications'),
-  markNotesRead: () => request('/teacher/notifications/read-all', { method: 'POST' }),
+  answerRequest: (id, answer) => request(`/requests/${id}/answer`, { method: 'POST', ...body({ answer }) }),
+  getNotes: () => request('/notifications?view=teacher'),
+  markNotesRead: () => request('/notifications/read-all?view=teacher', { method: 'POST' }),
 }
 
 export const teacherApi: TeacherApi = USE_MOCKS ? mockTeacherApi : realTeacherApi

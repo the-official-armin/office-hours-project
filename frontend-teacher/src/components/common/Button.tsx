@@ -88,7 +88,7 @@ export function IconButton({ ghost = false, className = '', type = 'button', chi
 
 /** A button that reads as a link. */
 export function TextButton({ className = '', type = 'button', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type={type} className={`border-0 bg-transparent p-0 text-sm font-bold text-link ${className}`} {...props} />
+  return <button type={type} className={`inline-flex min-h-11 items-center border-0 bg-transparent p-0 text-sm font-bold text-link ${className}`} {...props} />
 }
 
 /** A pill toggle (aria-pressed), used for days, filters, tabs and reminder times. */

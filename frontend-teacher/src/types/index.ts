@@ -43,11 +43,18 @@ export interface Booking {
   teacherId: string
   date: string
   timingId: string
-  seat: number
   studentId: string
   studentName: string
   reason: string
   status: BookingStatus
+  /** When the booking was made (ISO). Optional: the backend does not send it yet, and then bookings are ordered by id. */
+  createdAt?: string
+}
+
+/** What the student calendar fetches for a date range: the student's own bookings and requests, across all teachers. */
+export interface CalendarData {
+  bookings: Booking[]
+  requests: BookingRequest[]
 }
 
 export type RequestStatus = 'pending' | 'accepted' | 'declined'
@@ -72,7 +79,7 @@ export interface TeacherPrefs {
   email: string
   /** Reminder before each office hour. */
   remind: boolean
-  /** A student books a seat. */
+  /** A student books a spot. */
   booking: boolean
   /** A student cancels. */
   cancel: boolean
@@ -138,8 +145,7 @@ export type RuleCode =
   | 'past'
   | 'day_off'
   | 'no_office_hour'
-  | 'bad_seat'
-  | 'seat_taken'
+  | 'full'
   | 'already_booked'
   | 'conflict'
   | 'reason'

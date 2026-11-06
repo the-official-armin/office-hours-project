@@ -9,7 +9,7 @@ import Card from '../../components/common/Card'
 import { Eyebrow } from '../../components/common/Card'
 import { ErrorText } from '../../components/common/fields'
 import PageHeader from '../../components/common/PageHeader'
-import { SeatDots } from '../../components/common/SeatDots'
+import { SpotDots } from '../../components/common/SpotDots'
 import StudentBox from '../../components/teacher/StudentBox'
 import { teacherWorld, useTeacherData } from '../../hooks/TeacherData'
 import { useAction } from '../../hooks/useAction'
@@ -67,7 +67,7 @@ export default function TeacherCalendar() {
               <b className="text-[13px] font-extrabold">{r.timing.name}</b>
               <span>{formatRange(r.timing.start, r.timing.end)}</span>
               <span className="flex flex-wrap items-center gap-1.5 font-bold">
-                <SeatDots taken={r.taken} max={t.max} small /> {r.taken}/{t.max}
+                <SpotDots taken={r.taken} max={t.max} small /> {r.taken}/{t.max}
               </span>
               {r.bookings.length > 0 && <span className="font-medium text-ink2">{r.bookings.map((b) => b.studentName).join(', ')}</span>}
             </span>
@@ -171,7 +171,7 @@ export default function TeacherCalendar() {
                 <span className="text-[13px] text-muted">{formatRange(r.timing.start, r.timing.end)}</span>
               </div>
               <div className="flex items-center gap-2 text-[13px] font-semibold text-muted">
-                <SeatDots taken={r.taken} max={t.max} />
+                <SpotDots taken={r.taken} max={t.max} />
                 <span className="ml-1 tabular-nums">
                   {r.taken} of {t.max} seats
                 </span>

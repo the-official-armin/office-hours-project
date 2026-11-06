@@ -113,3 +113,15 @@ export const weekDays = (wk: string): string[] => [0, 1, 2, 3, 4].map((i) => toI
 
 /** Mon-Fri column headings: "Mon" ... "Fri". */
 export const WEEKDAY_HEADINGS = DOW_SHORT.slice(1, 6)
+
+/**
+ * Every date the grid shows, so a page can fetch exactly that range. Month view includes the leading and trailing days
+ * of the neighbouring months. Dates are inclusive and include weekends only where the range itself spans them.
+ */
+export function visibleRange(c: CalState): [string, string] {
+  if (c.view === 'month') {
+    const weeks = monthWeeks(c.month.y, c.month.m)
+    return [weeks[0][0], weeks[weeks.length - 1][4]]
+  }
+  return calRange(c)
+}

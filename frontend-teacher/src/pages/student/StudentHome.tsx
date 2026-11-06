@@ -1,4 +1,4 @@
-// Owner: Subgroup B (Teacher desktop UI). Purpose: the student's home: bookings at a glance, open seats this week,
+// Owner: Subgroup B (Teacher desktop UI). Purpose: the student's home: bookings at a glance, open spots this week,
 // and the requests waiting for an answer.
 import { Link, useNavigate } from 'react-router-dom'
 import Banner from '../../components/common/Banner'
@@ -7,8 +7,8 @@ import Card, { CardHead, CardTitle, Empty, Row } from '../../components/common/C
 import Chip from '../../components/common/Chip'
 import { ErrorText } from '../../components/common/fields'
 import PageHeader from '../../components/common/PageHeader'
-import { DateBlock, SeatDots } from '../../components/common/SeatDots'
-import { myWorld, seatWorld, useStudentData } from '../../hooks/StudentData'
+import { DateBlock, SpotDots } from '../../components/common/SpotDots'
+import { myWorld, spotWorld, useStudentData } from '../../hooks/StudentData'
 import { useAction } from '../../hooks/useAction'
 import { DOW_SHORT, dowOf, formatDateLong, formatDateShort, formatMonthDay, formatRange, formatTime, formatTimeShort, plural, toISODate } from '../../lib/dates'
 import { conflictingBooking, disruption, DISRUPT_TEXT, findTeacher, listSlots, timingOf, upcomingBookings, type Opening } from '../../lib/rules'
@@ -36,7 +36,7 @@ export default function StudentHome() {
 
   const me = data.settings
   const mine = myWorld(data)
-  const seats = seatWorld(data)
+  const spots = spotWorld(data)
   const today = toISODate(now)
   const first = me.name.split(' ')[0]
 
@@ -48,12 +48,12 @@ export default function StudentHome() {
   const teacherCount = new Set(up.map((b) => b.teacherId)).size
 
   const open: Opening[] = data.teachers
-    .flatMap((t) => listSlots(seats, t, today, 7, now))
+    .flatMap((t) => listSlots(spots, t, today, 7, now))
     .filter(
       (o) =>
         o.row.left > 0 &&
         !o.row.bookings.some((b) => b.studentId === me.id) &&
-        !conflictingBooking(seats, me.id, o.date, o.row.timing, o.teacher.id),
+        !conflictingBooking(spots, me.id, o.date, o.row.timing, o.teacher.id),
     )
     .sort((a, b) => (a.date + a.row.timing.start).localeCompare(b.date + b.row.timing.start))
 
@@ -81,7 +81,7 @@ export default function StudentHome() {
         <Stat
           label="Next office hour"
           value={next && nextTiming ? `${DOW_SHORT[dowOf(next.date)]} ${formatTimeShort(nextTiming.start)}` : 'None yet'}
-          sub={next && nextTeacher ? `${formatMonthDay(next.date)} · ${nextTeacher.name} · Seat ${next.seat}` : 'Find a teacher to book a seat'}
+          sub={next && nextTeacher ? `${formatMonthDay(next.date)} · ${nextTeacher.name}` : 'Find a teacher to book a spot'}
         />
         <Stat
           label="Open requests"
@@ -94,12 +94,17 @@ export default function StudentHome() {
         <Card aria-labelledby="up-h" className="flex-[3_1_460px]">
           <CardHead>
             <CardTitle id="up-h">Upcoming bookings</CardTitle>
-            <Link to="/student/bookings" className="text-sm font-bold text-link">
-              See all
-            </Link>
+            <span className="flex flex-wrap items-center gap-x-4">
+              <Link to="/student/calendar" className="inline-flex min-h-11 items-center text-sm font-bold text-link">
+                Open my calendar
+              </Link>
+              <Link to="/student/bookings" className="inline-flex min-h-11 items-center text-sm font-bold text-link">
+                See all
+              </Link>
+            </span>
           </CardHead>
           {up.length === 0 ? (
-            <Empty>No upcoming bookings. Pick a teacher and a seat to get started.</Empty>
+            <Empty>No upcoming bookings. Pick a teacher and a spot to get started.</Empty>
           ) : (
             up.slice(0, 3).map((b) => {
               const t = findTeacher(mine, b.teacherId)
@@ -118,8 +123,7 @@ export default function StudentHome() {
                     <div className="mt-1 text-[13px] text-ink2">{b.reason}</div>
                   </div>
                   <div className="flex flex-col items-end gap-1.5 max-[640px]:items-start">
-                    <Chip>Seat {b.seat}</Chip>
-                    {dis && <Chip kind="amber">{DISRUPT_TEXT[dis]}</Chip>}
+                    {dis ? <Chip kind="amber">{DISRUPT_TEXT[dis]}</Chip> : <Chip>Booked</Chip>}
                   </div>
                 </Row>
               )
@@ -130,13 +134,13 @@ export default function StudentHome() {
         <div className="flex flex-[2_1_340px] flex-col gap-6">
           <Card aria-labelledby="open-h">
             <CardHead>
-              <CardTitle id="open-h">Open seats this week</CardTitle>
-              <Link to="/student/teachers" className="text-sm font-bold text-link">
+              <CardTitle id="open-h">Open spots this week</CardTitle>
+              <Link to="/student/teachers" className="inline-flex min-h-11 items-center text-sm font-bold text-link">
                 All teachers
               </Link>
             </CardHead>
             {open.length === 0 ? (
-              <Empty>No open seats in the next 7 days.</Empty>
+              <Empty>No open spots in the next 7 days.</Empty>
             ) : (
               open.slice(0, 3).map((o) => (
                 <div key={`${o.teacher.id}-${o.date}-${o.row.timing.id}`} className="flex items-center gap-3 border-t border-line py-3.5">
@@ -148,8 +152,8 @@ export default function StudentHome() {
                       {formatDateShort(o.date)} &middot; {o.row.timing.name} {formatTime(o.row.timing.start)}
                     </div>
                     <div className="mt-2 flex items-center gap-2 text-[13px] font-semibold text-muted">
-                      <SeatDots taken={o.row.taken} max={o.teacher.max} />
-                      <span>{plural(o.row.left, 'seat')} left</span>
+                      <SpotDots taken={o.row.taken} max={o.teacher.max} />
+                      <span>{plural(o.row.left, 'spot')} left</span>
                     </div>
                   </div>
                   <Button
@@ -195,7 +199,7 @@ export default function StudentHome() {
         </div>
       </div>
 
-      <Banner>You can&rsquo;t book a time that has passed or a day your teacher is out, and an office hour closes when its seats are full.</Banner>
+      <Banner>You can&rsquo;t book a time that has passed or a day your teacher is out, and an office hour closes when its spots are full.</Banner>
     </>
   )
 }

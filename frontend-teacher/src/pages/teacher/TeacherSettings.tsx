@@ -20,13 +20,13 @@ type Toggle = Exclude<keyof TeacherPrefs, 'email' | 'lead'>
 
 const TOGGLES: { key: Toggle; label: string; hint: string }[] = [
   { key: 'remind', label: 'Reminder before each office hour', hint: 'Lists the students who booked that slot.' },
-  { key: 'booking', label: 'A student books a seat', hint: 'One email each time a seat is taken.' },
-  { key: 'cancel', label: 'A student cancels', hint: 'So you know when a seat opens up.' },
+  { key: 'booking', label: 'A student books a spot', hint: 'One email each time a spot is taken.' },
+  { key: 'cancel', label: 'A student cancels', hint: 'So you know when a spot opens up.' },
   { key: 'request', label: 'A student sends a request', hint: 'For times outside your office hours.' },
   { key: 'morning', label: 'Morning summary', hint: 'One email on days you hold office hours.' },
 ]
 
-const linkText = 'font-bold text-link'
+const linkText = 'inline-flex min-h-11 w-fit items-center font-bold text-link'
 
 export default function TeacherSettings() {
   const { data, now, saveSettings } = useTeacherData()

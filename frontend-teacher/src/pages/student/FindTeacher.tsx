@@ -1,4 +1,4 @@
-// Owner: Subgroup B (Teacher desktop UI). Purpose: search and filter the teachers, and see each one's next open seat.
+// Owner: Subgroup B (Teacher desktop UI). Purpose: search and filter the teachers, and see each one's next open spot.
 import { useState } from 'react'
 import { LinkButton } from '../../components/common/Button'
 import Card from '../../components/common/Card'
@@ -6,8 +6,8 @@ import Chip from '../../components/common/Chip'
 import { Field, TextInput } from '../../components/common/fields'
 import PageHeader from '../../components/common/PageHeader'
 import { Pill } from '../../components/common/Button'
-import { SeatDots } from '../../components/common/SeatDots'
-import { seatWorld, useStudentData } from '../../hooks/StudentData'
+import { SpotDots } from '../../components/common/SpotDots'
+import { spotWorld, useStudentData } from '../../hooks/StudentData'
 import { formatDateShort, plural, toISODate } from '../../lib/dates'
 import { listSlots } from '../../lib/rules'
 import { daysText, teacherInitial, timesText } from '../../lib/text'
@@ -18,7 +18,7 @@ export default function FindTeacher() {
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState('All')
 
-  const seats = seatWorld(data)
+  const spots = spotWorld(data)
   const today = toISODate(now)
   const groups = ['All', ...Array.from(new Set(data.teachers.map((t) => t.group)))]
 
@@ -27,15 +27,15 @@ export default function FindTeacher() {
     (t) => (group === 'All' || t.group === group) && (!q || `${t.name} ${t.subject}`.toLowerCase().includes(q)),
   )
 
-  const nextSeat = (t: Teacher) => {
-    const slots = listSlots(seats, t, today, 120, now)
+  const nextSpot = (t: Teacher) => {
+    const slots = listSlots(spots, t, today, 120, now)
     const first = slots[0]
     const open = slots.find((o) => o.row.left > 0)
     if (!first) return <div className="text-[13px] text-muted">No upcoming office hours</div>
     if (!open) {
       return (
         <>
-          <div className="text-sm font-bold">No open seats</div>
+          <div className="text-sm font-bold">No open spots</div>
           <div>
             <Chip kind="amber">Full for the next 4 months</Chip>
           </div>
@@ -48,8 +48,8 @@ export default function FindTeacher() {
           {formatDateShort(open.date)} &middot; {open.row.timing.name}
         </div>
         <div className="flex items-center gap-2 text-[13px] font-semibold text-muted">
-          <SeatDots taken={open.row.taken} max={t.max} />
-          <span>{plural(open.row.left, 'seat')} left</span>
+          <SpotDots taken={open.row.taken} max={t.max} />
+          <span>{plural(open.row.left, 'spot')} left</span>
         </div>
         {first.row.left <= 0 && (
           <div>
@@ -62,7 +62,7 @@ export default function FindTeacher() {
 
   return (
     <>
-      <PageHeader title="Find a teacher" subtitle="Pick a teacher to see their office hours and book a seat." />
+      <PageHeader title="Find a teacher" subtitle="Pick a teacher to see their office hours and book a spot." />
 
       <section aria-label="Search and filter" className="flex flex-wrap items-end gap-4">
         <Field label="Search by name or subject" className="max-w-[420px] flex-[1_1_260px]">
@@ -108,11 +108,11 @@ export default function FindTeacher() {
                   <div>{timesText(t)}</div>
                 </div>
                 <div className="mt-auto flex flex-col gap-2 border-t border-line pt-3.5">
-                  <div className="text-xs font-bold uppercase tracking-[.05em] text-muted">Next open seat</div>
-                  {nextSeat(t)}
+                  <div className="text-xs font-bold uppercase tracking-[.05em] text-muted">Next open spot</div>
+                  {nextSpot(t)}
                 </div>
-                <LinkButton to={`/student/teachers/${t.id}`} variant="primary" block aria-label={`Book a seat with ${t.name}`}>
-                  Book a seat
+                <LinkButton to={`/student/teachers/${t.id}`} variant="primary" block aria-label={`Book a spot with ${t.name}`}>
+                  Book a spot
                 </LinkButton>
               </Card>
             ))}

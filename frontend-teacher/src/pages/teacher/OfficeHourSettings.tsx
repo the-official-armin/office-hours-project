@@ -16,7 +16,7 @@ import { useToast } from '../../components/common/Toast'
 import { teacherWorld, useTeacherData } from '../../hooks/TeacherData'
 import { useAction } from '../../hooks/useAction'
 import { DOW_SHORT, formatTime, plural } from '../../lib/dates'
-import { MAX_SEATS, MAX_TIMINGS, MIN_SEATS, minSeats, orphanedBookings, stepSeats, validateHours } from '../../lib/rules'
+import { floorNote, MAX_SEATS, MAX_TIMINGS, MIN_SEATS, minSeats, orphanedBookings, stepSeats, validateHours } from '../../lib/rules'
 import type { Dow, Teacher, TimingDraft } from '../../types'
 
 /** Colour for the n-th timing: swatch, and the pale block used in the preview. */
@@ -270,7 +270,7 @@ export default function OfficeHourSettings() {
             </Stepper>
             {seatsNote && floor > 1 && max <= floor && (
               <p className="rounded-lg bg-amber px-3 py-2 text-[13px] font-semibold text-amber-ink">
-                {floor} is the lowest right now. A student already holds Seat {floor} in an upcoming office hour.
+                {floorNote(world, t.id, now)}
               </p>
             )}
           </Card>

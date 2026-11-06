@@ -1,4 +1,4 @@
-// Owner: Subgroup B (Teacher desktop UI). Purpose: requests for a different time (accept / decline) and the seats students
+// Owner: Subgroup B (Teacher desktop UI). Purpose: requests for a different time (accept / decline) and the spots students
 // booked, each with the student's reason. A table on desktop, stacked cards on phones.
 import { useSearchParams } from 'react-router-dom'
 import Button, { Pill } from '../../components/common/Button'
@@ -43,7 +43,7 @@ export default function BookingRequests() {
 
   return (
     <>
-      <PageHeader title="Booking requests" subtitle="Seats students booked, and requests for a time outside your office hours." />
+      <PageHeader title="Booking requests" subtitle="Bookings students made, and requests for a time outside your office hours." />
 
       <Card aria-label="Bookings and requests" className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Show">
@@ -127,7 +127,6 @@ export default function BookingRequests() {
                     </div>
                     <p className="leading-normal text-ink2">{b.reason}</p>
                     <div className="flex flex-wrap gap-2">
-                      <Chip>Seat {b.seat}</Chip>
                       {dis ? <Chip kind="amber">{DISRUPT_TEXT[dis]}</Chip> : <Chip>Confirmed</Chip>}
                     </div>
                   </div>

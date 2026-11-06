@@ -1,6 +1,17 @@
 // Shared: unit tests for the calendar scale logic.
 import { describe, expect, it } from 'vitest'
-import { calLabel, calNav, calRange, calSetView, initialCal, mondayOf, monthWeeks, shiftMonth, type CalState } from './calendar'
+import {
+  calLabel,
+  calNav,
+  calRange,
+  calSetView,
+  initialCal,
+  mondayOf,
+  monthWeeks,
+  shiftMonth,
+  visibleRange,
+  type CalState,
+} from './calendar'
 
 const TODAY = '2026-10-15' // Thursday
 
@@ -95,5 +106,30 @@ describe('monthWeeks', () => {
     expect(weeks[weeks.length - 1][0]).toBe('2026-08-31')
     // Nov 2026 starts on a Sunday: the first row is Nov 2 - 6.
     expect(monthWeeks(2026, 10)[0][0]).toBe('2026-11-02')
+  })
+})
+
+describe('visibleRange (what a page fetches)', () => {
+  const base: CalState = { view: 'week', wk: '2026-10-19', month: { y: 2026, m: 9 }, sel: null }
+
+  it('is the five days of the week', () => {
+    expect(visibleRange(base)).toEqual(['2026-10-19', '2026-10-23'])
+  })
+
+  it('includes the neighbouring days shown in a month grid', () => {
+    // October 2026: the grid starts Mon Sep 28 and ends Fri Oct 30.
+    expect(visibleRange({ ...base, view: 'month' })).toEqual(['2026-09-28', '2026-10-30'])
+    // November 2026 starts on a Sunday, so the grid starts Mon Nov 2 and ends Fri Dec 4.
+    expect(visibleRange({ ...base, view: 'month', month: { y: 2026, m: 10 } })).toEqual(['2026-11-02', '2026-12-04'])
+  })
+
+  it('is the whole of three months for a quarter', () => {
+    expect(visibleRange({ ...base, view: 'quarter' })).toEqual(['2026-10-01', '2026-12-31'])
+  })
+
+  it('changes when the student moves, so the page fetches again', () => {
+    const month: CalState = { ...base, view: 'month' }
+    expect(visibleRange(calNav(month, 1))).not.toEqual(visibleRange(month))
+    expect(visibleRange(calNav(base, 1))).toEqual(['2026-10-26', '2026-10-30'])
   })
 })

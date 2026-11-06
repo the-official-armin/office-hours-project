@@ -27,7 +27,7 @@ export default function InlineEditableTitle({
   return (
     <label
       title="Click to rename"
-      className="group inline-flex min-w-0 max-w-full cursor-text items-center gap-1.5 rounded-lg py-0.5 pl-0.5 pr-2 text-muted focus-within:[&_svg]:text-brand"
+      className="group inline-flex min-h-11 min-w-0 max-w-full cursor-text items-center gap-1.5 rounded-lg py-0.5 pl-0.5 pr-2 text-muted focus-within:[&_svg]:text-brand"
     >
       <span className="sr-only">{label}</span>
       <span className="inline-grid min-w-0 max-w-full">

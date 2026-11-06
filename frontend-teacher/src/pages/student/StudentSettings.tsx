@@ -19,14 +19,14 @@ import type { StudentPrefs } from '../../types'
 type Toggle = Exclude<keyof StudentPrefs, 'id' | 'name' | 'grade' | 'email' | 'lead'>
 
 const TOGGLES: { key: Toggle; label: string; hint: string }[] = [
-  { key: 'remind', label: 'Reminder before each office hour', hint: 'So you remember your seat.' },
-  { key: 'booked', label: 'My booking is confirmed', hint: 'One email each time you book a seat.' },
+  { key: 'remind', label: 'Reminder before each office hour', hint: 'So you remember your booking.' },
+  { key: 'booked', label: 'My booking is confirmed', hint: 'One email each time you book a spot.' },
   { key: 'answer', label: 'A teacher answers my request', hint: 'Accepted or declined.' },
   { key: 'out', label: 'A teacher cancels or is out', hint: 'So you can rebook another time.' },
 ]
 
 const GRADES = ['Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']
-const linkText = 'font-bold text-link'
+const linkText = 'inline-flex min-h-11 w-fit items-center font-bold text-link'
 
 export default function StudentSettings() {
   const { data, now, saveSettings } = useStudentData()
@@ -95,7 +95,7 @@ export default function StudentSettings() {
                   Hi {first}, your {nextTiming.name.toLowerCase()} office hour with {nextTeacher.name} starts in {s.lead}.
                 </p>
                 <div>
-                  <strong className="text-ink">Seat {next.seat}</strong> &middot; {next.reason}
+                  <strong className="text-ink">You&rsquo;re booked</strong> &middot; {next.reason}
                 </div>
                 <Link to="/student/bookings" className={linkText}>
                   Open my bookings

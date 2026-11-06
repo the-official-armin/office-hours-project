@@ -4,6 +4,7 @@ import type { Booking, BookingRequest, Teacher, TimingDraft } from '../types'
 import {
   affectedOn,
   applyTimings,
+  byBookingOrder,
   checkAccept,
   checkBooking,
   checkBookingReason,
@@ -12,9 +13,12 @@ import {
   checkRequest,
   disruption,
   firstBookableDay,
+  floorNote,
+  fullestOfficeHour,
   hoursNotices,
   listSlots,
   minSeats,
+  officeHourState,
   orphanedBookings,
   pastBookings,
   pendingRequests,
@@ -56,9 +60,10 @@ const okafor: Teacher = {
 }
 
 let n = 0
-function booking(partial: Partial<Booking> & Pick<Booking, 'date' | 'seat'>): Booking {
+function booking(partial: Partial<Booking> & Pick<Booking, 'date'>): Booking {
   n += 1
   return {
+    createdAt: new Date(2026, 9, 1, 8, 0, n).toISOString(),
     id: `b${n}`,
     teacherId: 'rivera',
     timingId: 'lunch',
@@ -78,13 +83,12 @@ const attempt = (over: Partial<Parameters<typeof checkBooking>[1]> = {}) => ({
   teacherId: 'rivera',
   date: NEXT_TUE,
   timingId: 'lunch',
-  seat: 1,
   studentId: 'maya',
   ...over,
 })
 
 describe('checkBooking', () => {
-  it('allows an open seat in a future office hour', () => {
+  it('allows an open spot in a future office hour', () => {
     expect(checkBooking(world(), attempt(), NOW)).toEqual({ ok: true })
   })
 
@@ -120,30 +124,40 @@ describe('checkBooking', () => {
     expect(checkBooking(world(), attempt({ teacherId: 'nobody' }), NOW)).toMatchObject({ code: 'no_office_hour' })
   })
 
-  it('needs a seat inside 1..max', () => {
-    expect(checkBooking(world(), attempt({ seat: 0 }), NOW)).toMatchObject({ code: 'bad_seat' })
-    expect(checkBooking(world(), attempt({ seat: 5 }), NOW)).toMatchObject({ code: 'bad_seat' })
-    expect(checkBooking(world(), attempt({ seat: 4 }), NOW)).toEqual({ ok: true })
+  it('allows the last spot, and blocks a full office hour (exactly full, 4 of 4)', () => {
+    const three = world({ bookings: Array.from({ length: 3 }, () => booking({ date: NEXT_TUE })) })
+    expect(checkBooking(three, attempt(), NOW)).toEqual({ ok: true })
+    const four = world({ bookings: Array.from({ length: 4 }, () => booking({ date: NEXT_TUE })) })
+    expect(checkBooking(four, attempt(), NOW)).toMatchObject({ ok: false, code: 'full' })
   })
 
-  it('blocks a seat already taken, and every seat once the office hour is full', () => {
-    const bookings = [1, 2, 3, 4].map((seat) => booking({ date: NEXT_TUE, seat }))
-    const w = world({ bookings })
-    for (const seat of [1, 2, 3, 4]) expect(checkBooking(w, attempt({ seat }), NOW)).toMatchObject({ code: 'seat_taken' })
+  it('counts only that office hour: another timing or day with 4 students is no obstacle', () => {
+    const bookings = [
+      ...Array.from({ length: 4 }, () => booking({ date: NEXT_TUE, timingId: 'after' })),
+      ...Array.from({ length: 4 }, () => booking({ date: NEXT_THU })),
+    ]
+    expect(checkBooking(world({ bookings }), attempt(), NOW)).toEqual({ ok: true })
   })
 
   it('ignores cancelled bookings', () => {
-    const w = world({ bookings: [booking({ date: NEXT_TUE, seat: 1, status: 'cancelled' })] })
-    expect(checkBooking(w, attempt(), NOW)).toEqual({ ok: true })
+    const cancelled = Array.from({ length: 4 }, () => booking({ date: NEXT_TUE, status: 'cancelled' }))
+    expect(checkBooking(world({ bookings: cancelled }), attempt(), NOW)).toEqual({ ok: true })
   })
 
-  it('blocks a second seat in the same office hour', () => {
-    const w = world({ bookings: [booking({ date: NEXT_TUE, seat: 2, studentId: 'maya' })] })
-    expect(checkBooking(w, attempt({ seat: 3 }), NOW)).toMatchObject({ code: 'already_booked' })
+  it('blocks a second spot in the same office hour', () => {
+    const mine = booking({ date: NEXT_TUE, studentId: 'maya' })
+    const w = world({ bookings: [mine, booking({ date: NEXT_TUE })] })
+    expect(checkBooking(w, attempt(), NOW)).toMatchObject({ code: 'already_booked' })
+  })
+
+  it('answers full before already_booked, in the backend order (the Book page checks the own spot first)', () => {
+    const mine = booking({ date: NEXT_TUE, studentId: 'maya' })
+    const w = world({ bookings: [mine, ...Array.from({ length: 3 }, () => booking({ date: NEXT_TUE }))] })
+    expect(checkBooking(w, attempt(), NOW)).toMatchObject({ code: 'full', message: 'That office hour is full. Pick another one.' })
   })
 
   it('blocks an overlap with another teacher, allows back-to-back or different times', () => {
-    const clash = booking({ date: NEXT_TUE, seat: 1, studentId: 'maya', teacherId: 'okafor' })
+    const clash = booking({ date: NEXT_TUE, studentId: 'maya', teacherId: 'okafor' })
     const w = world({ bookings: [clash] })
     expect(checkBooking(w, attempt(), NOW)).toMatchObject({ code: 'conflict' })
     expect(checkBooking(w, attempt({ timingId: 'after' }), NOW)).toEqual({ ok: true })
@@ -199,17 +213,42 @@ describe('checkRequest', () => {
 })
 
 describe('seats per office hour', () => {
-  it('floor is the highest seat in any upcoming booking', () => {
+  it('the floor is the most students booked in any ONE upcoming office hour', () => {
     const w = world({
       bookings: [
-        booking({ date: NEXT_TUE, seat: 3 }),
-        booking({ date: NEXT_THU, seat: 2 }),
-        booking({ date: '2026-10-13', seat: 4 }), // past, ignored
-        booking({ date: NEXT_TUE, seat: 4, status: 'cancelled' }), // cancelled, ignored
+        ...Array.from({ length: 3 }, () => booking({ date: NEXT_TUE })), // 3 in one office hour
+        ...Array.from({ length: 2 }, () => booking({ date: NEXT_THU })), // 2 in another
+        ...Array.from({ length: 4 }, () => booking({ date: '2026-10-13' })), // past, ignored
+        ...Array.from({ length: 4 }, () => booking({ date: NEXT_TUE, timingId: 'after', status: 'cancelled' })), // cancelled, ignored
       ],
     })
     expect(minSeats(w, 'rivera', NOW)).toBe(3)
+    expect(fullestOfficeHour(w, 'rivera', NOW)).toEqual({ count: 3, hours: 1 })
     expect(minSeats(world(), 'rivera', NOW)).toBe(1)
+  })
+
+  it('does not add up students across office hours or teachers', () => {
+    const w = world({
+      bookings: [
+        booking({ date: NEXT_TUE }),
+        booking({ date: NEXT_TUE, timingId: 'after' }),
+        booking({ date: NEXT_THU }),
+        ...Array.from({ length: 4 }, () => booking({ date: NEXT_TUE, teacherId: 'okafor' })),
+      ],
+    })
+    expect(minSeats(w, 'rivera', NOW)).toBe(1)
+  })
+
+  it('writes the note for one office hour and for several', () => {
+    const one = world({ bookings: Array.from({ length: 3 }, () => booking({ date: NEXT_TUE })) })
+    expect(floorNote(one, 'rivera', NOW)).toBe('3 is the lowest right now. One upcoming office hour already has 3 students booked.')
+    const two = world({
+      bookings: [
+        ...Array.from({ length: 2 }, () => booking({ date: NEXT_TUE })),
+        ...Array.from({ length: 2 }, () => booking({ date: NEXT_THU })),
+      ],
+    })
+    expect(floorNote(two, 'rivera', NOW)).toBe('2 is the lowest right now. 2 upcoming office hours already have 2 students booked.')
   })
 
   it('blocks "-" at the floor and clamps to 1..30', () => {
@@ -262,16 +301,16 @@ describe('checkHours', () => {
     expect(checkHours(world(), 'rivera', { timings: [draft()], max: 31 }, NOW)).toMatchObject({ code: 'invalid' })
   })
 
-  it('refuses seats below the highest held seat', () => {
-    const w = world({ bookings: [booking({ date: NEXT_TUE, seat: 3 })] })
-    expect(checkHours(w, 'rivera', { timings: [draft()], max: 2 }, NOW)).toMatchObject({ code: 'seat_floor' })
+  it('refuses seats below the fullest upcoming office hour', () => {
+    const w = world({ bookings: Array.from({ length: 3 }, () => booking({ date: NEXT_TUE })) })
+    expect(checkHours(w, 'rivera', { timings: [draft()], max: 2 }, NOW)).toMatchObject({ code: 'seat_floor', message: floorNote(w, 'rivera', NOW) })
     expect(checkHours(w, 'rivera', { timings: [draft()], max: 3 }, NOW)).toEqual({ ok: true })
   })
 })
 
 describe('schedule changes keep bookings and tell students', () => {
-  const b1 = booking({ date: NEXT_TUE, seat: 1, studentId: 'maya' })
-  const b2 = booking({ date: NEXT_THU, seat: 1, studentId: 'zoe', timingId: 'after' })
+  const b1 = booking({ date: NEXT_TUE, studentId: 'maya' })
+  const b2 = booking({ date: NEXT_THU, studentId: 'zoe', timingId: 'after' })
   const w = world({ bookings: [b1, b2] })
 
   it('counts orphaned bookings: removed timing or day no longer run', () => {
@@ -306,7 +345,7 @@ describe('schedule changes keep bookings and tell students', () => {
 
 describe('days off', () => {
   it('rejects a missing, past or duplicate day, but allows today and days with bookings', () => {
-    const w = world({ bookings: [booking({ date: NEXT_TUE, seat: 1 })] })
+    const w = world({ bookings: [booking({ date: NEXT_TUE })] })
     w.teachers[0].daysOff = [{ date: NEXT_THU, reason: '' }]
     const t = w.teachers[0]
     expect(checkDayOff(t, '', NOW)).toMatchObject({ code: 'missing' })
@@ -319,10 +358,10 @@ describe('days off', () => {
   it('counts only upcoming confirmed bookings on that day', () => {
     const w = world({
       bookings: [
-        booking({ date: NEXT_TUE, seat: 1 }),
-        booking({ date: NEXT_TUE, seat: 2, status: 'cancelled' }),
-        booking({ date: NEXT_TUE, seat: 3, teacherId: 'okafor' }),
-        booking({ date: TODAY, seat: 1 }), // lunch already started at 12:30
+        booking({ date: NEXT_TUE }),
+        booking({ date: NEXT_TUE, status: 'cancelled' }),
+        booking({ date: NEXT_TUE, teacherId: 'okafor' }),
+        booking({ date: TODAY }), // lunch already started at 12:30
       ],
     })
     expect(affectedOn(w, 'rivera', NEXT_TUE, NOW)).toHaveLength(1)
@@ -330,7 +369,7 @@ describe('days off', () => {
   })
 
   it('flags bookings on a day off or on a timing that no longer runs', () => {
-    const b = booking({ date: NEXT_TUE, seat: 1 })
+    const b = booking({ date: NEXT_TUE })
     const w = world({ bookings: [b] })
     expect(disruption(w, b)).toBeNull()
     w.teachers[0].daysOff = [{ date: NEXT_TUE, reason: '' }]
@@ -345,7 +384,7 @@ describe('days off', () => {
 
 describe('lookups', () => {
   it('lists office hours with seats, and skips started ones and days off in listSlots', () => {
-    const w = world({ bookings: [booking({ date: NEXT_TUE, seat: 1 }), booking({ date: NEXT_TUE, seat: 2 })] })
+    const w = world({ bookings: [booking({ date: NEXT_TUE }), booking({ date: NEXT_TUE })] })
     const rows = slotRows(w, w.teachers[0], NEXT_TUE, NOW)
     expect(rows.map((r) => [r.timing.id, r.taken, r.left, r.started])).toEqual([
       ['lunch', 2, 2, false],
@@ -361,9 +400,9 @@ describe('lookups', () => {
   })
 
   it('splits upcoming and past bookings, and sorts pending requests', () => {
-    const up = booking({ date: NEXT_TUE, seat: 1, studentId: 'maya' })
-    const past = booking({ date: '2026-10-13', seat: 1, studentId: 'maya' })
-    const cancelled = booking({ date: NEXT_THU, seat: 1, studentId: 'maya', status: 'cancelled' })
+    const up = booking({ date: NEXT_TUE, studentId: 'maya' })
+    const past = booking({ date: '2026-10-13', studentId: 'maya' })
+    const cancelled = booking({ date: NEXT_THU, studentId: 'maya', status: 'cancelled' })
     const w = world({ bookings: [up, past, cancelled] })
     const mine = (b: Booking) => b.studentId === 'maya'
     expect(upcomingBookings(w, mine, NOW)).toEqual([up])
@@ -382,9 +421,9 @@ describe('what a student sees', () => {
   it('classifies a day: selectable, left, mine, full, started', () => {
     const w = world({
       bookings: [
-        booking({ date: NEXT_TUE, seat: 1, studentId: me }),
-        ...[2, 3, 4].map((seat) => booking({ date: NEXT_THU, seat })),
-        ...[1, 2, 3, 4].map((seat) => booking({ date: NEXT_THU, seat, timingId: 'after' })),
+        booking({ date: NEXT_TUE, studentId: me }),
+        ...Array.from({ length: 3 }, () => booking({ date: NEXT_THU })),
+        ...Array.from({ length: 4 }, () => booking({ date: NEXT_THU, timingId: 'after' })),
       ],
     })
     const t = w.teachers[0]
@@ -394,12 +433,12 @@ describe('what a student sees', () => {
     expect(studentDay(w, t, '2026-10-13', NOW, me)).toMatchObject({ selectable: false, past: true })
   })
 
-  it('is full only when bookable and every seat in every unstarted office hour is taken', () => {
+  it('is full only when bookable and every spot in every unstarted office hour is taken', () => {
     const w = world({
-      bookings: [1, 2, 3, 4].flatMap((seat) => [
-        booking({ date: NEXT_TUE, seat }),
-        booking({ date: NEXT_TUE, seat, timingId: 'after' }),
-      ]),
+      bookings: Array.from({ length: 4 }, () => [
+        booking({ date: NEXT_TUE }),
+        booking({ date: NEXT_TUE, timingId: 'after' }),
+      ]).flat(),
     })
     expect(studentDay(w, w.teachers[0], NEXT_TUE, NOW, me)).toMatchObject({ full: true, left: 0, bookable: true })
   })
@@ -416,11 +455,79 @@ describe('what a student sees', () => {
     expect(studentDay(w, w.teachers[0], NEXT_TUE, NOW, me)).toMatchObject({ selectable: false, off: true })
   })
 
-  it('finds the first day with a seat to book', () => {
+  it('finds the first day with a spot to book', () => {
     const w = world()
     expect(firstBookableDay(w, w.teachers[0], TODAY, NOW)).toBe(TODAY) // after school today is still ahead
     expect(firstBookableDay(w, w.teachers[0], TODAY, new Date(2026, 9, 15, 17, 0))).toBe(NEXT_TUE)
     w.teachers[0].timings = []
     expect(firstBookableDay(w, w.teachers[0], TODAY, NOW)).toBe(TODAY)
+  })
+})
+
+describe('the state of an office hour on the Book page', () => {
+  const me = 'maya'
+  const stateOf = (w: World, date: string, timingId = 'lunch', now = NOW) => {
+    const t = w.teachers[0]
+    const row = slotRows(w, t, date, now).find((r) => r.timing.id === timingId)!
+    return officeHourState(w, t, row, date, me)
+  }
+
+  it('is bookable when there is room, nothing clashes and it has not started', () => {
+    expect(stateOf(world(), NEXT_TUE).kind).toBe('bookable')
+  })
+
+  it('is full when every spot is taken by other students', () => {
+    const w = world({ bookings: Array.from({ length: 4 }, () => booking({ date: NEXT_TUE })) })
+    expect(stateOf(w, NEXT_TUE).kind).toBe('full')
+  })
+
+  it('is booked when the student already holds a spot, even if the office hour is full', () => {
+    const mine = booking({ date: NEXT_TUE, studentId: me })
+    const w = world({ bookings: [mine, ...Array.from({ length: 3 }, () => booking({ date: NEXT_TUE }))] })
+    expect(stateOf(w, NEXT_TUE)).toEqual({ kind: 'booked', booking: mine })
+  })
+
+  it('is started once the start time has passed, and that beats every other state', () => {
+    const late = new Date(2026, 9, 15, 12, 30)
+    expect(stateOf(world(), TODAY, 'lunch', late).kind).toBe('started')
+    const mine = world({ bookings: [booking({ date: TODAY, studentId: me })] })
+    expect(stateOf(mine, TODAY, 'lunch', late).kind).toBe('started')
+  })
+
+  it('is a clash when the student is booked at an overlapping time with another teacher', () => {
+    const other = booking({ date: NEXT_TUE, studentId: me, teacherId: 'okafor' })
+    const state = stateOf(world({ bookings: [other] }), NEXT_TUE)
+    expect(state).toMatchObject({ kind: 'clash', with: other })
+    expect(state.kind === 'clash' && state.teacher?.name).toBe('Mr. Okafor')
+  })
+
+  it('a clash comes before full, and a different timing at another time is not a clash', () => {
+    const other = booking({ date: NEXT_TUE, studentId: me, teacherId: 'okafor' })
+    const w = world({ bookings: [other, ...Array.from({ length: 4 }, () => booking({ date: NEXT_TUE }))] })
+    expect(stateOf(w, NEXT_TUE).kind).toBe('clash')
+    expect(stateOf(world({ bookings: [other] }), NEXT_TUE, 'after').kind).toBe('bookable')
+  })
+
+  it('orders bookings by id when the backend sends no createdAt (numeric ids as numbers)', () => {
+    const plain = (id: string) => ({ ...booking({ date: NEXT_TUE }), id, createdAt: undefined })
+    const w = world({ bookings: [plain('10'), plain('9'), plain('2')] })
+    const row = slotRows(w, w.teachers[0], NEXT_TUE, NOW).find((r) => r.timing.id === 'lunch')!
+    expect(row.bookings.map((b) => b.id)).toEqual(['2', '9', '10'])
+    expect(byBookingOrder(plain('9'), plain('10'))).toBeLessThan(0)
+  })
+
+  it('uses createdAt when only some bookings have it, without throwing', () => {
+    const dated = booking({ date: NEXT_TUE, createdAt: '2026-10-01T08:00:00.000Z' })
+    const bare = { ...booking({ date: NEXT_TUE }), id: '1', createdAt: undefined }
+    expect(() => byBookingOrder(dated, bare)).not.toThrow()
+  })
+
+  it('lists the students of an office hour in the order they booked', () => {
+    const first = booking({ date: NEXT_TUE, createdAt: '2026-10-01T08:00:00.000Z' })
+    const second = booking({ date: NEXT_TUE, createdAt: '2026-10-02T08:00:00.000Z' })
+    const third = booking({ date: NEXT_TUE, createdAt: '2026-10-03T08:00:00.000Z' })
+    const w = world({ bookings: [third, first, second] })
+    const row = slotRows(w, w.teachers[0], NEXT_TUE, NOW).find((r) => r.timing.id === 'lunch')!
+    expect(row.bookings.map((b) => b.id)).toEqual([first.id, second.id, third.id])
   })
 })

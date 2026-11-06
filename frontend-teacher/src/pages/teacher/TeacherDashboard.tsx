@@ -9,7 +9,7 @@ import Chip from '../../components/common/Chip'
 import { ErrorText } from '../../components/common/fields'
 import Icon from '../../components/common/Icon'
 import PageHeader from '../../components/common/PageHeader'
-import { DateBlock, SeatsEnd } from '../../components/common/SeatDots'
+import { DateBlock, SpotsEnd } from '../../components/common/SpotDots'
 import { RequestsModal, UpcomingModal } from '../../components/teacher/DashboardModals'
 import RequestMini from '../../components/teacher/RequestMini'
 import { teacherWorld, useTeacherData } from '../../hooks/TeacherData'
@@ -35,7 +35,7 @@ function greeting(hour: number): string {
 
 function ViewAll({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <TextButton onClick={onClick} className="inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap">
+    <TextButton onClick={onClick} className="gap-1.5 whitespace-nowrap">
       {label}
       <Icon name="expand" size={16} strokeWidth={2} />
     </TextButton>
@@ -77,7 +77,7 @@ export default function TeacherDashboard() {
             <Card aria-labelledby="next-h">
               <div className="flex items-center justify-between gap-3">
                 <Eyebrow id="next-h">Next office hour</Eyebrow>
-                <Link to={`/teacher/calendar?day=${next.date}`} className="text-sm font-bold text-link">
+                <Link to={`/teacher/calendar?day=${next.date}`} className="inline-flex min-h-11 items-center text-sm font-bold text-link">
                   Open in calendar
                 </Link>
               </div>
@@ -91,7 +91,7 @@ export default function TeacherDashboard() {
                     {formatRange(next.row.timing.start, next.row.timing.end)}
                   </div>
                 </div>
-                <SeatsEnd taken={next.row.taken} max={t.max} />
+                <SpotsEnd taken={next.row.taken} max={t.max} />
               </div>
               <div className="mt-[18px] flex flex-wrap gap-2 border-t border-line pt-4">
                 {next.row.bookings.length === 0 ? (
@@ -110,7 +110,6 @@ export default function TeacherDashboard() {
                         {initials(b.studentName)}
                       </span>
                       {b.studentName}
-                      <small className="text-xs font-semibold text-muted">Seat {b.seat}</small>
                     </span>
                   ))
                 )}
@@ -138,7 +137,7 @@ export default function TeacherDashboard() {
                     <div className="text-[15px] font-bold">{o.row.timing.name}</div>
                     <div className="mt-0.5 text-[13px] text-muted">{formatRange(o.row.timing.start, o.row.timing.end)}</div>
                   </div>
-                  <SeatsEnd taken={o.row.taken} max={t.max} />
+                  <SpotsEnd taken={o.row.taken} max={t.max} />
                 </Row>
               ))
             )}
@@ -179,7 +178,7 @@ export default function TeacherDashboard() {
           <Card aria-labelledby="off-h">
             <CardHead>
               <CardTitle id="off-h">Coming days off</CardTitle>
-              <Link to="/teacher/days-off" className="text-sm font-bold text-link">
+              <Link to="/teacher/days-off" className="inline-flex min-h-11 items-center text-sm font-bold text-link">
                 Manage
               </Link>
             </CardHead>
