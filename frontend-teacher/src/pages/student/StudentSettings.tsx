@@ -13,6 +13,7 @@ import { myWorld, useStudentData } from '../../hooks/StudentData'
 import { useAction } from '../../hooks/useAction'
 import { useAuth } from '../../hooks/useAuth'
 import { formatTime } from '../../lib/dates'
+import { endSentence } from '../../lib/text'
 import { findTeacher, timingOf, upcomingBookings } from '../../lib/rules'
 import type { StudentPrefs } from '../../types'
 
@@ -114,7 +115,7 @@ export default function StudentSettings() {
 
           <Card aria-labelledby="acct-h" className="flex flex-col gap-3">
             <CardTitle id="acct-h">Account</CardTitle>
-            <p className="text-muted">Signed in as {s.name}.</p>
+            <p className="text-muted">Signed in as {endSentence(s.name)}</p>
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => toast('Changing a password isn’t part of this preview.')}>Change password</Button>
               <Button

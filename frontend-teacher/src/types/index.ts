@@ -159,6 +159,7 @@ export type RuleCode =
   | 'duplicate_day_off'
   | 'seat_floor'
   | 'unauthorized'
+  | 'forbidden'
   | 'invalid_credentials'
 
 /** What the app shell (sidebar, top bar, tab bar) shows. */

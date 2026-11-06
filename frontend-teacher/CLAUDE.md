@@ -53,6 +53,8 @@ real login), build the Alma integration, or write backend code.
 - [x] Themes (3 palettes, light / dark / system), fixed sidebar
 - [ ] Put the school crest at `public/school-logo.png`
 - [x] `docs/api-contract.md` matches the current endpoints; `docs/backend-connection-report.md` lists what the backend still has to build
-- [ ] Switch from mocks to the real API
+- [x] Works against the real API (`VITE_USE_MOCKS=false`): every page checked live as two students and two teachers
 - [x] Sign-in: role chooser, `/student/login`, `/teacher/login`, token + `GET /auth/me` restore, route guards, 401 handling (mock accounts in mock mode)
-- [ ] Backend endpoints that check the token (so the signed-in person's own data comes back), refresh token, logout, rate limit: see "Authentication gaps" in `docs/api-contract.md`
+- [x] Backend endpoints check the token, so the signed-in person's own data comes back (`401` / `403` handled)
+- [ ] Refresh token, server-side logout, login rate limit: see "Authentication gaps" in `docs/api-contract.md`
+- [x] `vercel.json` (page refreshes on Vercel) and CI in `.github/workflows/ci.yml`

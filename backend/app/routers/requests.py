@@ -14,7 +14,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from .. import rules, views
-from ..deps import current_student, current_teacher, get_db, now_local, push_note
+from ..deps import (CurrentUser, check_view, current_student, current_teacher, current_user, get_db,
+                    now_local, push_note)
 from ..errors import RuleError
 from ..models import BookingRequest, Student, Teacher
 from ..schemas import SendRequestIn
@@ -32,8 +33,8 @@ def list_requests(view: str = Query(pattern="^(teacher|student)$"),
                   from_date: Optional[date] = Query(default=None, alias="from"),
                   to_date: Optional[date] = Query(default=None, alias="to"),
                   db: Session = Depends(get_db),
-                  teacher: Teacher = Depends(current_teacher),
-                  student: Student = Depends(current_student)):
+                  me: CurrentUser = Depends(current_user)):
+    check_view(view, me)
     if from_date is not None and to_date is not None and from_date > to_date:
         raise RuleError("invalid", "The from date must be on or before the to date.")
     date_filter = []
@@ -45,7 +46,7 @@ def list_requests(view: str = Query(pattern="^(teacher|student)$"),
         rows = (
             db.query(BookingRequest)
             .options(joinedload(BookingRequest.student))
-            .filter(BookingRequest.teacher_id == teacher.id, *date_filter)
+            .filter(BookingRequest.teacher_id == me.user.id, *date_filter)
             .all()
         )
         rows.sort(key=lambda r: (r.date.isoformat(), r.time))
@@ -53,7 +54,7 @@ def list_requests(view: str = Query(pattern="^(teacher|student)$"),
         rows = (
             db.query(BookingRequest)
             .options(joinedload(BookingRequest.student))
-            .filter(BookingRequest.student_id == student.id, *date_filter)
+            .filter(BookingRequest.student_id == me.user.id, *date_filter)
             .order_by(BookingRequest.id)
             .all()
         )

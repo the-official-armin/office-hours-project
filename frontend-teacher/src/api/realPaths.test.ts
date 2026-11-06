@@ -92,15 +92,18 @@ describe('real student API paths', () => {
     expect(calls[4].body).not.toHaveProperty('seat')
   })
 
-  it('builds the calendar from the two student lists, cut to the range (the backend has no range query yet)', async () => {
+  it('asks the backend for the date range and still cuts to it', async () => {
     const booking = (id: string, date: string) => ({ id, date, teacherId: 'rivera', timingId: 't1', studentId: 'maya', studentName: 'Maya K.', reason: 'x', status: 'confirmed' })
     const req = (id: string, date: string) => ({ id, date, teacherId: 'rivera', studentId: 'maya', studentName: 'Maya K.', time: '15:45', reason: 'x', status: 'pending', note: '' })
     const calls = stubFetch({
-      '/bookings?view=student': [booking('1', '2026-09-30'), booking('2', '2026-10-01'), booking('3', '2026-10-31'), booking('4', '2026-11-01')],
-      '/requests?view=student': [req('9', '2026-10-15'), req('10', '2026-12-01')],
+      '/bookings?view=student&from=2026-10-01&to=2026-10-31': [booking('1', '2026-09-30'), booking('2', '2026-10-01'), booking('3', '2026-10-31'), booking('4', '2026-11-01')],
+      '/requests?view=student&from=2026-10-01&to=2026-10-31': [req('9', '2026-10-15'), req('10', '2026-12-01')],
     })
     const cal = await realStudentApi.getCalendar('2026-10-01', '2026-10-31')
-    expect(calls.map((c) => c.path).sort()).toEqual(['/bookings?view=student', '/requests?view=student'])
+    expect(calls.map((c) => c.path).sort()).toEqual([
+      '/bookings?view=student&from=2026-10-01&to=2026-10-31',
+      '/requests?view=student&from=2026-10-01&to=2026-10-31',
+    ])
     expect(cal.bookings.map((b) => b.id)).toEqual(['2', '3']) // both ends inclusive
     expect(cal.requests.map((r) => r.id)).toEqual(['9'])
     expect(calls.every((c) => !c.path.includes('/student/calendar'))).toBe(true)

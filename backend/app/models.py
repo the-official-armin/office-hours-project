@@ -13,11 +13,13 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     Time,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -101,6 +103,11 @@ class Student(Base):
 
 class Booking(Base):
     __tablename__ = "bookings"
+    __table_args__ = (
+        # One confirmed booking per student per office hour, even when two requests arrive at once.
+        Index("uq_bookings_one_per_student", "student_id", "date", "timing_id", unique=True,
+              sqlite_where=text("status = 'confirmed'"), postgresql_where=text("status = 'confirmed'")),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     teacher_id = Column(String, ForeignKey("teachers.id"), nullable=False, index=True)

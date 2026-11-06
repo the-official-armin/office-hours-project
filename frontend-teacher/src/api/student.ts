@@ -37,11 +37,12 @@ export const realStudentApi: StudentApi = {
   getSpotBookings: () => request('/bookings?view=open'),
   getBookings: () => request('/bookings?view=student'),
   getRequests: () => request('/requests?view=student'),
-  // The backend has no date-range query yet, so ask for this student's lists and cut them to the range here.
+  // The backend filters by date (from/to, both inclusive); calendarInRange also sorts and keeps the shape mock mode returns.
   getCalendar: async (from, to) => {
+    const range = `&from=${from}&to=${to}`
     const [bookings, requests] = await Promise.all([
-      request<Booking[]>('/bookings?view=student'),
-      request<BookingRequest[]>('/requests?view=student'),
+      request<Booking[]>(`/bookings?view=student${range}`),
+      request<BookingRequest[]>(`/requests?view=student${range}`),
     ])
     return calendarInRange(bookings, requests, from, to)
   },

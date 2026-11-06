@@ -55,9 +55,9 @@ exception handler that produces this shape (including for request-validation err
 | `seat_floor` | 409 | Seats per office hour cannot drop below the number of students booked in the fullest upcoming office hour |
 | `invalid_credentials` | 401 | Sign in failed: unknown role, user ID or password. One answer for all three, so it never says which was wrong |
 | `unauthorized` | 401 | No bearer token, or it is invalid or expired, or its user no longer exists |
+| `forbidden` | 403 | Signed in, but as the other role: a student calling `/teacher/...` or `?view=teacher`, a teacher booking a spot |
 
-Also: `403` when the role is wrong (a student calling `/teacher/...`). The frontend has no special code for it yet; any other
-body is shown as `message`. A `422` with FastAPI's own `detail` is what a malformed request body gets.
+The frontend shows `message` for any of these. A `422` with FastAPI's own `detail` is what a malformed request body gets.
 
 ## 2. Limits and constants
 
@@ -134,9 +134,9 @@ Matches `backend/README.md` and `backend/app/routers/auth.py` (backend PR #15). 
 - **Log out is client-side** (the backend has no logout endpoint): the token is forgotten and the person sees "Signed out".
 - A `403` is not treated as "session ended": the token is fine, the role is wrong.
 
-**What every other endpoint must do** (the next backend step; today the backend still answers as the demo user when no token is sent):
-`401 unauthorized` when the bearer token is missing, invalid or expired; `403` when the token's role is not allowed (a student on
-`/teacher/...`); and the identity (`teacher.id`, `student.id`) always comes from the token's `sub`, never from the request.
+**What every other endpoint does** (`backend/app/deps.py`):
+`401 unauthorized` when the bearer token is missing, invalid or expired; `403 forbidden` when the token's role is not allowed (a
+student on `/teacher/...`, or a `?view=` for the other role); and the identity (`teacher.id`, `student.id`) always comes from the token's `sub`, never from the request.
 
 **Mock mode** (`VITE_USE_MOCKS=true`) behaves the same way: accounts `maya`, `daniel` (students) and `rivera`, `okafor` (teachers), password
 `demo-password` (the backend's demo seed password), a 400 ms delay, `401 invalid_credentials` for anything wrong, and tokens that last 60
@@ -396,21 +396,21 @@ The frontend works without these today. Each one would remove a workaround.
 | Wanted from the backend | Why | What the frontend does until then |
 | --- | --- | --- |
 | ~~`createdAt` (ISO 8601) on every `Booking`~~ **Done** on `origin/main` (`0391a7f`, `null` allowed) | The teacher lists students in the order they booked | `createdAt` stays optional in `Booking`. When it is missing or `null`, bookings are ordered by `id` (numbers compare as numbers), which is the order the backend creates them in |
-| A date-range query on the student lists, for example `GET /bookings?view=student&from=&to=` and `GET /requests?view=student&from=&to=` | The My calendar page needs only a week, month or quarter | It fetches the whole `view=student` lists and cuts them to the range in the browser (`calendarInRange`). Fine for one school year, wasteful beyond that |
+| ~~A date-range query on the student lists~~ **Done** (`from` / `to`, both inclusive, on `GET /bookings` and `GET /requests`) | The My calendar page needs only a week, month or quarter | My calendar asks for the visible range and still cuts to it (`calendarInRange`) |
 
 ### Authentication gaps
 
-What the frontend would like added to the auth in `backend/app/routers/auth.py`. None of it blocks sign-in today.
+What the frontend would like added to the auth in `backend/app`. None of it blocks sign-in today; the rows marked **Done** are in.
 
 | Wanted from the backend | Why | What the frontend does until then |
 | --- | --- | --- |
-| **Endpoints check the token** (`current_teacher` / `current_student` read `Authorization: Bearer`, `401` without or with a bad one, `403` for the wrong role), then drop `ME_TEACHER_ID` / `ME_STUDENT_ID` | Today every endpoint answers as `rivera` / `maya` whoever signed in, so signing in only changes the name on screen | It already sends the token on every request and ends the session on a `401` |
+| ~~**Endpoints check the token**~~ **Done** (`app/deps.py`: `401 unauthorized` without or with a bad token, `403 forbidden` for the wrong role or `view`; `ME_TEACHER_ID` / `ME_STUDENT_ID` removed) | Every endpoint answers for the person who signed in | Sends the token on every request and ends the session on a `401` |
 | A **refresh token** (rotated, stored hashed, 7 to 30 days, revoked on logout) in an `httpOnly` cookie, plus `POST /auth/refresh` -> `{ accessToken, expiresIn }` | The access token lasts 60 minutes (`JWT_EXPIRE_MINUTES`). Without a refresh, people are signed out hourly, and the frontend must keep the access token in `sessionStorage` / `localStorage`, where a script injected into the page could read it | The token is kept in `sessionStorage` (or `localStorage` with "Keep me signed in"). After a `401` the person signs in again |
 | `POST /auth/logout` -> `204` (revokes the refresh token) | A real log out | Log out forgets the token in the browser only; the token stays valid until it expires |
 | **Rate limit** on `POST /auth/login`, per account and per IP, answering `429` | Stops password guessing | It shows "Too many tries. Wait a few minutes and try again." for a `429`, but nothing sends one yet |
 | A distinct answer for the right ID on the wrong side, for example `403 WRONG_ROLE` ("This is a student account. Use student sign in.") | Friendlier than a blind "incorrect" | It shows the same "User ID or password is incorrect." for every login failure. Never saying which part was wrong is also the safe default |
-| **CORS limited to the frontend's origin** (not `*`). With a refresh cookie it also needs `allow_credentials=True` with that exact origin | `allow_origins=["*"]` with credentials is rejected by browsers, and `*` lets any site call the API from a signed-in browser | The frontend sends no cookies today, so `*` works for now |
-| **`JWT_SECRET` set to a long random value** in every deployed environment (the code has a development default) | A known secret lets anyone mint tokens for any user | Not applicable (backend setting) |
+| ~~**CORS limited to the frontend's origin**~~ **Done**: `CORS_ORIGINS` (comma-separated); empty allows any `localhost` port for development. Credentials are off (the token travels in a header). A refresh cookie would need `allow_credentials=True` | `*` lets any site call the API | Nothing to do |
+| **`JWT_SECRET` set to a long random value** in every deployed environment. The backend now logs a warning when it runs on Postgres with the development default | A known secret lets anyone mint tokens for any user | Not applicable (backend setting) |
 | Real passwords, not `demo-password`; **no public sign-up** (accounts created by the school) | The demo seed gives every account the same password | There is no sign-up page |
 | `GET /auth/me` could also return the fields the sidebar shows (`subject` for a teacher, `grade` for a student) | The profile is read again from `/teacher/settings` and `/student/settings` after sign-in | It shows what the settings endpoints return |
 

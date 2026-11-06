@@ -2,7 +2,7 @@
 
 Students book office-hour meetings with teachers the way you pick seats in a theater: pick a teacher, see availability on a calendar, take an open slot, and leave a short reason. Teachers set when they are available. Everyone gets an email reminder.
 
-This repo is a school-club MVP. Roles are **Student**, **Teacher**, and **Admin**. The first working UI in this repo is the Teacher desktop app. The backend currently contains the database models, Alembic migration, and local PostgreSQL setup; the FastAPI API entrypoint is still to be added.
+This repo is a school-club MVP. Roles are **Student**, **Teacher**, and **Admin**. Students and teachers each have a working web app (`frontend-teacher/`) backed by a FastAPI + PostgreSQL API (`backend/`) with sign-in; admin is planned.
 
 ## What we are building
 
@@ -91,206 +91,83 @@ Do not edit another subgroup’s folders without coordinating. Shared files (`ap
 office-hours-project/
   README.md
   docs/
-    git-workflow.md      beginner Git / PR rules
-    api-contract.md      frontend ↔ backend agreement
+    git-workflow.md                beginner Git / PR rules
+    api-contract.md                frontend <-> backend agreement (backend/README.md wins on paths)
+    backend-connection-report.md   what is connected and what is still open
   .github/
     pull_request_template.md
-  frontend-teacher/      Teacher UI (React + Vite)
-    src/pages/teacher/   Teacher pages
-    src/pages/student/   stub (other team)
-    src/pages/admin/     stub (other team)
-    src/pages/auth/      stub (other team)
-    src/api/             API client + teacher mocks
-    src/types/           shared types (must match the API contract)
-  backend/               Python models, Alembic migration, and PostgreSQL setup
-  Student Page UI Desgin/  student UI brainstorm notes
+    workflows/ci.yml               tests on every pull request
+  frontend-teacher/                the web app for students and teachers (React + Vite)
+    src/pages/student|teacher|auth/
+    src/api/                       the only place that talks to the backend (+ mocks)
+    src/auth/                      sign-in, token, route guards
+    src/types/                     shared types (match the API)
+  backend/                         FastAPI + SQLAlchemy API, Alembic migrations, Dockerfile
 ```
 
-The backend database layer is in this repo. The API routes and FastAPI application entrypoint are not finished yet.
+## The app
 
-## Teacher UI (current app)
+One React app serves both roles. Routes live in `frontend-teacher/src/routes/AppRoutes.tsx`.
 
-Routes live in `frontend-teacher/src/routes/AppRoutes.tsx`. Desktop only (min width 1024px).
-
-| Path | Page | Purpose |
+| Path | Who | Page |
 | --- | --- | --- |
-| `/login` | Login | Auth placeholder |
-| `/teacher` | TeacherDashboard | Upcoming office hours and booked students |
-| `/teacher/office-hours` | OfficeHourSettings | Two timing options + max students per slot |
-| `/teacher/calendar` | TeacherCalendar | Availability and bookings |
-| `/teacher/days-off` | DaysOff | Mark and remove days off |
-| `/teacher/requests` | BookingRequests | Student bookings and reason summaries |
-| `/teacher/settings` | TeacherSettings | Profile and email reminder preferences |
-| `/student` | StudentDashboard | Placeholder for the student team |
-| `/admin` | AdminDashboard | Placeholder for the admin team |
+| `/login`, `/student/login`, `/teacher/login` | everyone | Pick a side, then sign in with user ID and password |
+| `/student` | student | Home, My calendar, Find a teacher, Book a spot, My bookings, Settings |
+| `/teacher` | teacher | Dashboard, Calendar, Office hours, Days off, Booking requests, Settings |
 
-`VITE_USE_MOCKS` defaults to `true`, so the Teacher UI can run without a live backend.
+`VITE_USE_MOCKS` defaults to `true`, so the app runs without a backend (data lives in the browser).
+Demo accounts in both modes: students `maya`, `daniel`, teachers `rivera`, `okafor`, password `demo-password`.
 
-## Run the frontend locally
+## Run it locally
 
-You need Node.js (current LTS is fine).
+You need Node.js (current LTS) and Python 3.9 or newer.
+
+**Frontend only (mock data):**
 
 ```bash
 cd frontend-teacher
-cp .env.example .env.local
 npm install
+npm run dev            # http://localhost:5173
+```
+
+**Frontend + backend:**
+
+```bash
+# terminal 1
+cd backend
+python3 -m venv venv && venv/bin/pip install -r requirements.txt   # once
+cp .env.example .env                                               # once
+venv/bin/uvicorn app.main:app --reload --port 8000 --env-file .env
+
+# terminal 2
+cd frontend-teacher
+cp .env.example .env.local     # once; then set VITE_USE_MOCKS=false
 npm run dev
 ```
 
-Open the URL Vite prints (usually `http://localhost:5173`). The app redirects `/` to `/teacher`.
+The backend creates a SQLite database with demo data on first run. API docs: <http://localhost:8000/docs>.
+PostgreSQL, settings and deployment: [`backend/README.md`](backend/README.md).
 
-Useful scripts (from `frontend-teacher/`):
-
-```bash
-npm run dev      # local server
-npm run build    # type-check + production build
-npm run lint     # oxlint
-```
-
-Environment (see `.env.example`):
-
-```
-VITE_API_URL=http://localhost:8000
-VITE_USE_MOCKS=true
-```
+Useful scripts (from `frontend-teacher/`): `npm run build`, `npx vitest run`, `npm run lint`, `npm run e2e`
+(run `npx playwright install` once first). Backend tests: `cd backend && venv/bin/python -m pytest tests -q`.
 
 Never commit `.env` files or secrets. Only `.env.example` with placeholder values belongs in Git.
 
-## Backend (from zero)
+## Deploy
 
-### Current backend status
+| Part | Where | Settings |
+| --- | --- | --- |
+| Frontend | Vercel, project root `frontend-teacher` (`vercel.json` makes page refreshes work) | `VITE_API_URL=<backend URL>`, `VITE_USE_MOCKS=false` |
+| Backend | Any Docker host with Postgres (Render, Railway, Fly.io): `backend/Dockerfile` | `DATABASE_URL`, `JWT_SECRET`, `SCHOOL_TZ`, `CORS_ORIGINS=<frontend URL>`, `AUTO_SEED=false` |
 
-The `backend/` directory currently provides:
-
-- SQLAlchemy models in `backend/models.py`
-- PostgreSQL 15 configuration in `backend/docker-compose.yml`
-- An initial Alembic migration in `backend/alembic/versions/`
-
-There is not yet a `backend/main.py` (or another FastAPI application module), so the API server cannot be started successfully yet. Do not run `uvicorn main:app` until the FastAPI entrypoint is added. The steps below prepare the local database and Python environment for the backend team.
-
-### Prerequisites
-
-Install these tools before starting:
-
-- Python 3.9 or newer
-- Docker Desktop (including Docker Compose)
-- Git
-
-Check the installations:
-
-```bash
-python3 --version
-docker --version
-docker compose version
-```
-
-### 1. Create and activate the Python environment
-
-From the repository root:
-
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-```
-
-On Windows PowerShell, activate the environment with:
-
-```powershell
-cd backend
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
-
-Install the packages needed by the current models and migration files:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install fastapi uvicorn sqlalchemy psycopg2-binary alembic
-```
-
-### 2. Start PostgreSQL
-
-Keep the terminal in `backend/` and start only the database service:
-
-```bash
-docker compose up -d db
-```
-
-Confirm that PostgreSQL is running:
-
-```bash
-docker compose ps
-```
-
-The local database uses these values from `backend/docker-compose.yml`:
-
-```text
-Host:     localhost
-Port:     5432
-Database: office_hours_db
-User:     postgres
-Password: secretpassword
-```
-
-To stop PostgreSQL later:
-
-```bash
-docker compose down
-```
-
-To stop it and delete the local database volume, which deletes local data:
-
-```bash
-docker compose down -v
-```
-
-### 3. Run the database migration
-
-Before running Alembic for the first time, make sure `backend/alembic.ini` has this local development URL:
-
-```ini
-sqlalchemy.url = postgresql+psycopg2://postgres:secretpassword@localhost:5432/office_hours_db
-```
-
-Then, from `backend/` with the virtual environment active:
-
-```bash
-alembic upgrade head
-```
-
-This creates the current tables (`users`, `clubs`, `teacher_profiles`, appointments, and schedule tables). Run the migration again after pulling a new migration from the backend team.
-
-### 4. Start the backend API
-
-The API start command will be:
-
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Run it from `backend/`, where `main.py` must export a FastAPI object named `app`. At the moment that file and the API routes have not been added, so this command is documented for the completed backend and will currently return an import error.
-
-Once the entrypoint exists, open:
-
-- API: <http://localhost:8000>
-- Swagger UI: <http://localhost:8000/docs>
-- ReDoc: <http://localhost:8000/redoc>
-
-For frontend development, set `VITE_API_URL=http://localhost:8000` in `frontend-teacher/.env.local` and set `VITE_USE_MOCKS=false` only after the backend endpoints are available. Until then, keep `VITE_USE_MOCKS=true`.
+Before real people use it: create real accounts (the demo password is public) and set `JWT_SECRET`.
 
 ## API contract
 
-`docs/api-contract.md` is the agreement between frontend and backend. The backend owns booking rules. Types in `frontend-teacher/src/types/` must match whatever is agreed.
-
-Teacher endpoints currently proposed:
-
-- `GET/PATCH /teachers/me`
-- `GET/PUT /teachers/me/office-hours`
-- `GET/POST /teachers/me/days-off` and `DELETE /teachers/me/days-off/{id}`
-- `GET /teachers/me/bookings`
-
-Auth (login / logout, JWT) and Alma are not part of that contract yet.
+[`backend/README.md`](backend/README.md) lists every endpoint and is the source of truth.
+[`docs/api-contract.md`](docs/api-contract.md) describes the same API from the frontend's side, and
+`frontend-teacher/src/api/realPaths.test.ts` fails if the frontend's paths drift from it.
+The backend enforces every booking rule; the frontend only shows them early.
 
 ## Git workflow
 
@@ -311,11 +188,13 @@ Full beginner steps: [`docs/git-workflow.md`](docs/git-workflow.md). Use the PR 
 
 | Area | Status |
 | --- | --- |
-| Teacher page shells + layout | In repo (placeholders filling in) |
-| Student / Admin / Login pages | Stubs |
-| Mock teacher API | In repo (`VITE_USE_MOCKS=true`) |
-| PostgreSQL models + initial migration | In repo (`backend/`) |
-| FastAPI API routes + server entrypoint | Not implemented yet |
-| JWT auth wiring | Not wired |
+| Student and teacher pages | Done |
+| Sign-in (JWT), route guards, each user sees their own data | Done |
+| FastAPI API, booking rules, migrations | Done |
+| Frontend connected to the backend (`VITE_USE_MOCKS=false`) | Done |
+| CI (backend tests, frontend lint/build/tests/e2e) | Done |
+| Deploy (Vercel + Docker host + Postgres) | Ready to set up |
+| Refresh token, logout on the server, login rate limit | Open (see `docs/api-contract.md`) |
 | Email reminders | Planned |
+| Admin pages | Planned |
 | Alma integration | Stretch only — do not build yet |

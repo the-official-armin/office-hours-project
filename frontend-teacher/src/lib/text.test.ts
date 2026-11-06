@@ -1,7 +1,7 @@
 // Shared: tests for the wording helpers.
 import { describe, expect, it } from 'vitest'
 import type { Teacher } from '../types'
-import { daysText, teacherInitial, timesText } from './text'
+import { daysText, endSentence, teacherInitial, timesText } from './text'
 
 const t = (timings: Teacher['timings']): Teacher => ({ id: 'x', name: 'Ms. X', subject: 'S', group: 'G', max: 4, daysOff: [], timings })
 
@@ -34,5 +34,10 @@ describe('text helpers', () => {
     expect(teacherInitial('Dr. Lindqvist')).toBe('L')
     expect(teacherInitial('Ms. Rivera')).toBe('R')
     expect(teacherInitial('Mr. Jo Tanaka')).toBe('JT')
+  })
+
+  it('ends a sentence after a name without a double period', () => {
+    expect(endSentence('Maya K.')).toBe('Maya K.')
+    expect(endSentence('Ms. Rivera')).toBe('Ms. Rivera.')
   })
 })

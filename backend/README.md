@@ -9,10 +9,10 @@ The API is organized as **resources shared by both roles**: bookings, requests a
 notifications each live under one path, with a `view` parameter deciding whose data
 you see. Teacher-only things (schedule, days off) sit under `/teacher`.
 
-Authentication is available through JWT. Existing frontend/demo requests without an
-`Authorization` header continue to use the configured demo identities
-(`ME_TEACHER_ID=rivera` / `ME_STUDENT_ID=maya`); authenticated clients should send
-`Authorization: Bearer <accessToken>`.
+Every endpoint except `GET /healthz`, `GET /teachers` and `POST /auth/login` needs
+`Authorization: Bearer <accessToken>` (from `POST /auth/login`) and answers for the person
+in that token: no token or a bad one is `401 unauthorized`, the wrong role is
+`403 forbidden`.
 
 ## Quick start
 
@@ -21,7 +21,8 @@ cd backend
 python3 -m venv venv            # once
 venv/bin/pip install -r requirements.txt
 
-venv/bin/uvicorn app.main:app --reload --port 8000
+cp .env.example .env            # once; the defaults work locally
+venv/bin/uvicorn app.main:app --reload --port 8000 --env-file .env
 ```
 
 The database (`office_hours.db`, SQLite) and the demo dataset are created automatically
@@ -39,16 +40,36 @@ VITE_API_URL=http://localhost:8000
 VITE_USE_MOCKS=false
 ```
 
+Sign in with any demo account, password `demo-password`: students `maya`, `daniel`,
+`alex`, teachers `rivera`, `okafor` (all ids are in `app/seed.py`).
+
+## Settings
+
+All settings are environment variables; `.env.example` lists them with comments.
+
+| Variable | Default | Deployed |
+| --- | --- | --- |
+| `DATABASE_URL` | SQLite file `office_hours.db` | The host's Postgres URL (`postgres://` is accepted) |
+| `JWT_SECRET` | a development value (warns at startup on Postgres) | A long random value |
+| `JWT_EXPIRE_MINUTES` | `60` | `60` |
+| `SCHOOL_TZ` | the server clock | The school's zone, e.g. `America/Los_Angeles` (hosts run in UTC) |
+| `CORS_ORIGINS` | any `localhost` port | The frontend's URL, e.g. `https://office-hours.vercel.app` |
+| `AUTO_SEED` | `true` | `false` |
+
 ## API reference
 
 Conventions: dates are `YYYY-MM-DD`, times are `HH:MM` (24h), both in school local
-time. All endpoints answer for the signed-in demo user — no ids in the path except
+time. All endpoints answer for the signed-in user — no ids in the path except
 where noted. Every rule violation answers with HTTP 409 (404 when something no longer
-exists) and a JSON body `{ "code": "<RuleCode>", "message": "<text>" }`, which is what
+exists, 401 when not signed in, 403 for the wrong role) and a JSON body `{ "code": "<RuleCode>", "message": "<text>" }`, which is what
 the frontend's `RuleError` expects.
 
 Rule codes: `past`, `day_off`, `no_office_hour`, `full`, `already_booked`, `conflict`,
-`reason`, `duplicate_day_off`, `seat_floor`, `not_found`, `missing`, `invalid`.
+`reason`, `duplicate_day_off`, `seat_floor`, `not_found`, `missing`, `invalid`,
+`unauthorized`, `forbidden`, `invalid_credentials`.
+
+The `view` parameter must match the signed-in role: `view=teacher` for teachers,
+`view=student` and `view=open` for students (`403 forbidden` otherwise).
 
 ### Authentication
 
@@ -126,20 +147,33 @@ The JSON mirrors `frontend-teacher/src/types/index.ts`:
 
 ```bash
 cd backend
-venv/bin/python -m pytest tests -q     # 54 tests: rule engine + API integration
+venv/bin/python -m pytest tests -q     # rule engine + API integration + who may call what
 ```
 
 ## PostgreSQL (deployment)
 
 ```bash
-docker-compose up -d                  # Postgres 15 on localhost:5432
-DATABASE_URL=postgresql://postgres:secretpassword@localhost:5432/office_hours_db \
-  venv/bin/alembic upgrade head
-DATABASE_URL=postgresql://... venv/bin/python -m app.seed
+# backend/.env: set POSTGRES_PASSWORD and DATABASE_URL (see .env.example)
+docker compose up -d db               # Postgres 15 on localhost:5432
+set -a; source .env; set +a
+venv/bin/alembic upgrade head
+venv/bin/python -m app.seed           # demo data, local only
 ```
 
 `DATABASE_URL` is read from the environment everywhere (uvicorn, alembic, tests).
-Times are school local time (the server's local clock), matching the frontend.
+Times are school local time (`SCHOOL_TZ`, else the server's clock), matching the frontend.
+
+A database volume made before the password moved to `.env` still has the old password
+`secretpassword`: put that in `.env`, or start fresh with `docker compose down -v`.
+
+## Deploy
+
+- **Docker image:** `Dockerfile` installs the requirements, runs `alembic upgrade head`,
+  then starts uvicorn on `$PORT`. Works on Render, Railway, Fly.io and similar.
+- **Environment:** `DATABASE_URL` (managed Postgres), `JWT_SECRET`, `SCHOOL_TZ`,
+  `CORS_ORIGINS` (the frontend's URL), `AUTO_SEED=false`.
+- **Accounts:** the demo seed is for development. Create real accounts with real
+  passwords (`app.security.hash_password`) before anyone uses the deployed site.
 
 ## Layout
 
@@ -155,10 +189,11 @@ Times are school local time (the server's local clock), matching the frontend.
 | `app/routers/notifications.py` | both inboxes + read-all |
 | `app/views.py` | ORM ↔ rule-view loading and JSON serialization (camelCase) |
 | `app/seed.py` | Demo dataset, a port of `src/api/mocks/seed.ts` (built from today) |
-| `app/deps.py` | DB session, placeholder current user, notification helper |
-| `app/errors.py` | `RuleError` → HTTP: `not_found` is 404, every other rule is 409 `{code, message}` |
+| `app/deps.py` | DB session, signed-in user from the token (`current_user` / `current_teacher` / `current_student`, `check_view`), school clock, notification helper |
+| `app/security.py` | Password hashing (scrypt) and JWT helpers |
+| `app/routers/auth.py` | `POST /auth/login`, `GET /auth/me` |
+| `app/errors.py` | `RuleError` → HTTP: `not_found` 404, `unauthorized` / `invalid_credentials` 401, `forbidden` 403, every other rule 409 `{code, message}` |
 | `tests/` | Rule engine unit tests + API integration tests on a seeded in-memory DB |
 
-Note: `docs/api-contract.md` is the older teacher-only proposal; the implemented API
-follows the resource layout above, which matches what the frontend calls
-(`src/api/teacher.ts`, `student.ts`).
+`docs/api-contract.md` describes the same API from the frontend's side; where the two
+disagree, this README wins.

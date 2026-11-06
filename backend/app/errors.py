@@ -14,6 +14,7 @@ _STATUS_BY_CODE = {
     "not_found": 404,
     "invalid_credentials": 401,
     "unauthorized": 401,
+    "forbidden": 403,
 }
 
 
