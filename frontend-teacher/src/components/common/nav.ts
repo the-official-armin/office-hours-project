@@ -58,6 +58,7 @@ export const NAV_TREE: Record<Role, NavNode[]> = {
   ],
   student: [
     { id: 'home', label: 'Home', to: '/student', icon: 'grid' },
+    { id: 'mycal', label: 'My calendar', to: '/student/calendar', icon: 'cal' },
     { id: 'teachers', label: 'Find a teacher', to: '/student/teachers', icon: 'user', prefix: true },
     {
       id: 'mybk',
@@ -93,6 +94,7 @@ export const TAB_ITEMS: Record<Role, TabItem[]> = {
   ],
   student: [
     { id: 'home', label: 'Home', to: '/student', icon: 'grid' },
+    { id: 'mycal', label: 'Calendar', to: '/student/calendar', icon: 'cal' },
     { id: 'teachers', label: 'Teachers', to: '/student/teachers', icon: 'user', prefix: true },
     { id: 'bookings', label: 'Bookings', to: '/student/bookings', icon: 'calcheck', badge: 'disrupted' },
     { id: 'settings', label: 'Settings', to: '/student/settings', icon: 'sliders' },

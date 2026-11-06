@@ -12,7 +12,7 @@ npm run dev          # add  -- --open  to open the browser
 ```
 
 Open the URL Vite prints (usually http://localhost:5173) and pick **Teacher** (Ms. Rivera) or **Student** (Maya K.).
-Whatever one side does shows up on the other: a seat Maya books appears for Ms. Rivera, and her answers reach Maya.
+Whatever one side does shows up on the other: a spot Maya books appears for Ms. Rivera, and her answers reach Maya.
 
 | Command | What it does |
 | --- | --- |
@@ -27,7 +27,7 @@ To check the app on any day, run the tests with a fixed date: `$env:VITE_TEST_NO
 
 - Teacher: `/teacher` (Dashboard), `/teacher/calendar`, `/teacher/office-hours`, `/teacher/days-off`,
   `/teacher/requests?tab=requests|bookings`, `/teacher/settings`
-- Student: `/student` (Home), `/student/teachers`, `/student/teachers/:teacherId?day=YYYY-MM-DD`,
+- Student: `/student` (Home), `/student/calendar` (My calendar), `/student/teachers`, `/student/teachers/:teacherId?day=YYYY-MM-DD`,
   `/student/bookings?tab=up|past|req`, `/student/settings`
 - `/login` is a placeholder sign-in (pick a side). Real login belongs to the auth team.
 
@@ -54,7 +54,7 @@ Put the crest at `public/school-logo.png` (square PNG, 256x256 or more). Until i
 
 `pages -> useTeacher() / useStudent() -> src/api/teacher.ts | student.ts -> mock store or real backend`
 
-- The domain rules (no past or started office hours, no booking on a day off, seats, one seat per office hour, no
+- The domain rules (no past or started office hours, no booking on a day off, seats per office hour, one booking per student per office hour, no
   overlaps, schedule changes keep bookings) are pure functions in `src/lib/rules.ts`. The mock store enforces them;
   the real backend must enforce the same ones. The UI only shows and pre-validates them.
 - `VITE_USE_MOCKS=true` (default) answers from a store in localStorage (`officehours.demo.v2`) seeded from today's date.

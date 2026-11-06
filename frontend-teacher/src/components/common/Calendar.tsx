@@ -197,22 +197,28 @@ export function CalendarGrid({ cal, today, onSelect, renderDay, renderMini }: Gr
   )
 }
 
-/** The colour key under a calendar. `extra` adds role-specific entries. */
-export function CalendarLegend({ extra }: { extra?: ReactNode }) {
+export interface LegendEntry {
+  /** Tailwind classes that draw the little swatch. */
+  swatch: string
+  label: string
+}
+
+const DEFAULT_ENTRIES: LegendEntry[] = [
+  { swatch: 'bg-tint', label: 'Seats open' },
+  { swatch: 'bg-amber', label: 'Full or day off' },
+  { swatch: 'border border-edge bg-past', label: 'Past, can’t be booked' },
+]
+
+/** The colour key under a calendar. `entries` replaces the default key; `extra` adds role-specific entries after it. */
+export function CalendarLegend({ extra, entries = DEFAULT_ENTRIES }: { extra?: ReactNode; entries?: LegendEntry[] }) {
   return (
     <div className="flex flex-wrap gap-4 pt-4 text-[13px] text-muted">
-      <span className="inline-flex items-center gap-2">
-        <i className="inline-block h-3.5 w-3.5 rounded bg-tint" />
-        Seats open
-      </span>
-      <span className="inline-flex items-center gap-2">
-        <i className="inline-block h-3.5 w-3.5 rounded bg-amber" />
-        Full or day off
-      </span>
-      <span className="inline-flex items-center gap-2">
-        <i className="inline-block h-3.5 w-3.5 rounded border border-edge bg-past" />
-        Past, can&rsquo;t be booked
-      </span>
+      {entries.map((e) => (
+        <span key={e.label} className="inline-flex items-center gap-2">
+          <i className={`inline-block h-3.5 w-3.5 rounded ${e.swatch}`} />
+          {e.label}
+        </span>
+      ))}
       {extra}
     </div>
   )

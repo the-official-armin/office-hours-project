@@ -129,7 +129,7 @@ describe('Teacher pages render with the example data', () => {
     const bookings = render(<BookingRequests />, '/?tab=bookings')
     expect(bookings).toContain('Bookings (')
     expect(bookings).toContain('Confirmed')
-    expect(bookings).toContain('Seat ')
+    expect(bookings).not.toMatch(/Seat \d/)
   })
 
   it('Settings: profile, switches, lead time, preview and account', () => {

@@ -1,8 +1,9 @@
-// Owner: Subgroup B (Teacher desktop UI). Purpose: pick a day on a teacher's calendar, pick a seat in a theater-style
-// grid, say why, and book. Also "Need a different time? Send a request".
+// Owner: Subgroup B (Teacher desktop UI). Purpose: pick a day on a teacher's calendar and book a spot in one of that day's
+// office hours (no seat numbers), or ask for a different time.
 // The backend enforces every rule; the UI pre-validates with src/lib/rules.ts and shows the backend's message if it refuses.
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { RuleError } from '../../api/errors'
 import Banner from '../../components/common/Banner'
 import Button, { LinkButton } from '../../components/common/Button'
 import { CalendarControls, CalendarGrid, CalendarLegend, type DayRender, type MiniRender } from '../../components/common/Calendar'
@@ -10,12 +11,13 @@ import Card, { Eyebrow } from '../../components/common/Card'
 import { ErrorText, Field, TextArea, TextInput } from '../../components/common/fields'
 import Icon from '../../components/common/Icon'
 import PageHeader from '../../components/common/PageHeader'
-import SlotSeats, { SeatKeys } from '../../components/student/SlotSeats'
-import { seatWorld, useStudentData } from '../../hooks/StudentData'
+import { useToast } from '../../components/common/Toast'
+import OfficeHourCard from '../../components/student/OfficeHourCard'
+import { spotWorld, useStudentData } from '../../hooks/StudentData'
 import { useAction } from '../../hooks/useAction'
 import { initialCal, mondayOf, monthOf, type CalState } from '../../lib/calendar'
 import { formatDateLong, formatRange, isValidISODate, plural, toISODate } from '../../lib/dates'
-import { checkBookingReason, checkRequest, errorOf, firstBookableDay, REASON_MAX, slotRows, studentDay } from '../../lib/rules'
+import { checkRequest, errorOf, firstBookableDay, officeHourState, slotRows, studentDay } from '../../lib/rules'
 import { daysText } from '../../lib/text'
 import type { Teacher } from '../../types'
 
@@ -23,17 +25,17 @@ interface Done {
   date: string
   slotName: string
   time: string
-  seat: number
 }
 
-function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
-  const { data, now, bookSeat, sendRequest } = useStudentData()
+function BookSpotFor({ teacher: t }: { teacher: Teacher }) {
+  const { data, now, bookSpot, cancelBooking, sendRequest, refresh } = useStudentData()
   const [params] = useSearchParams()
-  const booking = useAction()
+  const toast = useToast()
   const asking = useAction()
+  const cancelling = useAction()
 
   const me = data.settings
-  const world = seatWorld(data)
+  const world = spotWorld(data)
   const today = toISODate(now)
 
   const [cal, setCal] = useState<CalState>(() => {
@@ -41,9 +43,11 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
     const day = asked && isValidISODate(asked) ? asked : firstBookableDay(world, t, today, now)
     return { ...initialCal(today, day), month: monthOf(day), wk: mondayOf(day) }
   })
-  const [pick, setPick] = useState<{ timingId: string; seat: number } | null>(null)
+  const [composing, setComposing] = useState<string | null>(null)
   const [reason, setReason] = useState('')
-  const [problem, setProblem] = useState('')
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [fullFor, setFullFor] = useState<string | null>(null)
+  const [otherError, setOtherError] = useState<{ timingId: string; text: string } | null>(null)
   const [done, setDone] = useState<Done | null>(null)
   const [reqOpen, setReqOpen] = useState(false)
   const [reqSent, setReqSent] = useState(false)
@@ -53,8 +57,9 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
 
   const asideRef = useRef<HTMLElement>(null)
   const doneRef = useRef<HTMLHeadingElement>(null)
+  const requestRef = useRef<HTMLDivElement>(null)
 
-  // On a phone the day panel sits below the calendar, so bring it into view after a pick or a booking.
+  // On a phone the day panel sits below the calendar, so bring it into view after a day is picked or a spot is booked.
   useEffect(() => {
     if (scrollTick > 0 && window.innerWidth < 900) asideRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
   }, [scrollTick])
@@ -67,9 +72,9 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
 
   const selectDay = (date: string) => {
     setCal((c) => ({ ...c, sel: date }))
-    setPick(null)
-    setProblem('')
-    booking.setError(null)
+    setComposing(null)
+    setFullFor(null)
+    setOtherError(null)
     setDone(null)
     setReqSent(false)
     setScrollTick((n) => n + 1)
@@ -85,10 +90,10 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
           ? s.full
             ? ', full'
             : s.bookable
-              ? `, ${plural(s.left, 'seat')} left`
+              ? `, ${plural(s.left, 'spot')} left`
               : ', already started'
           : ', no office hours'
-    return { s, aria: `${formatDateLong(date)}${tail}${s.mine ? ', you have a seat' : ''}` }
+    return { s, aria: `${formatDateLong(date)}${tail}${s.mine ? ', you have a booking' : ''}` }
   }
 
   const renderDay = (date: string, view: 'week' | 'month'): DayRender => {
@@ -101,8 +106,8 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
         <span className="text-[13px] text-muted">No office hours</span>
       ) : (
         s.rows.map((r) => {
-          const mine = r.bookings.find((b) => b.studentId === me.id)
-          const status = mine ? `Your seat ${mine.seat}` : s.past || r.started ? 'Started' : r.left <= 0 ? 'Full' : `${plural(r.left, 'seat')} left`
+          const mine = r.bookings.some((b) => b.studentId === me.id)
+          const status = mine ? 'Your booking' : s.past || r.started ? 'Started' : r.left <= 0 ? 'Full' : `${plural(r.left, 'spot')} left`
           const tone = mine
             ? 'bg-brand text-on-brand'
             : s.past || r.started
@@ -140,7 +145,7 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
               <span className={`${chip} bg-amber text-amber-ink`}>Full</span>
             ) : (
               <span className={`${chip} bg-tint text-tint-ink`}>
-                <span className="max-[640px]:hidden">{plural(s.left, 'seat')} left</span>
+                <span className="max-[640px]:hidden">{plural(s.left, 'spot')} left</span>
                 <span className="hidden max-[640px]:inline">{s.left} left</span>
               </span>
             ))}
@@ -156,29 +161,45 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
     return { status, aria, dot: s.mine, disabled: !s.selectable }
   }
 
-  const confirm = async () => {
-    if (!pick) {
-      setProblem('Pick a seat first.')
-      return
-    }
-    const reasonProblem = errorOf(checkBookingReason(reason))
-    if (reasonProblem) {
-      setProblem(reasonProblem)
-      return
-    }
-    setProblem('')
-    const x = t.timings.find((y) => y.id === pick.timingId)!
-    const booked = await booking.run(
-      'book',
-      () => bookSeat({ teacherId: t.id, date: day, timingId: pick.timingId, seat: pick.seat, reason }),
-      'Seat booked.',
-    )
-    if (booked) {
-      setDone({ date: day, slotName: x.name, time: formatRange(x.start, x.end), seat: booked.seat })
-      setPick(null)
+  const confirm = async (timingId: string) => {
+    setConfirming(timingId)
+    setOtherError(null)
+    setFullFor(null)
+    try {
+      await bookSpot({ teacherId: t.id, date: day, timingId, reason })
+      const x = t.timings.find((y) => y.id === timingId)!
+      toast('Spot booked.')
+      setDone({ date: day, slotName: x.name, time: formatRange(x.start, x.end) })
+      setComposing(null)
       setReason('')
       setScrollTick((n) => n + 1)
+    } catch (err) {
+      if (err instanceof RuleError && err.code === 'full') {
+        // Someone took the last spot while this form was open. Show the real numbers, keep what the student typed.
+        setFullFor(timingId)
+        setComposing(null)
+        await refresh().catch(() => undefined)
+      } else {
+        setOtherError({ timingId, text: err instanceof Error ? err.message : 'Something went wrong. Try again.' })
+        await refresh().catch(() => undefined)
+      }
+    } finally {
+      setConfirming(null)
     }
+  }
+
+  const cancelHere = async (id: string) => {
+    await cancelling.run(id, () => cancelBooking(id), 'Booking cancelled.')
+  }
+
+  const askForRequest = () => {
+    setReqOpen(true)
+    setReqSent(false)
+    setReq((r) => ({ ...r, date: day >= today ? day : '' }))
+    requestAnimationFrame(() => {
+      requestRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      requestRef.current?.querySelector<HTMLInputElement>('input[type=date]')?.focus()
+    })
   }
 
   const send = async () => {
@@ -201,11 +222,6 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
   const past = day < today
   const off = t.daysOff.find((d) => d.date === day)
   const rows = slotRows(world, t, day, now)
-  const pickedRow = pick ? rows.find((r) => r.timing.id === pick.timingId) : undefined
-  const summary =
-    pick && pickedRow
-      ? `${formatDateLong(day)} · ${pickedRow.timing.name} ${formatRange(pickedRow.timing.start, pickedRow.timing.end)} · Seat ${pick.seat}`
-      : 'No seat picked yet'
   const timingNames = t.timings
     .filter((x) => !x.gone)
     .map((x) => x.name.toLowerCase())
@@ -219,7 +235,7 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
             <Icon name="left" size={16} strokeWidth={2} />
             All teachers
           </Link>
-          <h1 className="mt-1 text-balance text-2xl font-extrabold tracking-tight min-[900px]:text-[28px]">Book a seat with {t.name}</h1>
+          <h1 className="mt-1 text-balance text-2xl font-extrabold tracking-tight min-[900px]:text-[28px]">Book a spot with {t.name}</h1>
           <p className="mt-1.5 text-[15px] text-muted">
             {t.subject} &middot; {daysText(t)}, {timingNames}
           </p>
@@ -231,10 +247,15 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
         <Card aria-label="Pick a day" className="flex-[999_1_520px] !p-3 min-[900px]:!p-5">
           <CalendarGrid cal={cal} today={today} onSelect={selectDay} renderDay={renderDay} renderMini={renderMini} />
           <CalendarLegend
+            entries={[
+              { swatch: 'bg-tint', label: 'Spots open' },
+              { swatch: 'bg-amber', label: 'Full or day off' },
+              { swatch: 'border border-edge bg-past', label: 'Past, can’t be booked' },
+            ]}
             extra={
               <span className="inline-flex items-center gap-2">
                 <i className="inline-block h-3.5 w-3.5 rounded bg-brand" />
-                Your seat
+                Your booking
               </span>
             }
           />
@@ -254,7 +275,7 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
             </h2>
             <div className="rounded-xl bg-soft px-3.5 py-3 text-sm leading-[1.6] text-ink2">
               <b className="text-ink">
-                {formatDateLong(done.date)} &middot; {done.slotName} {done.time} &middot; Seat {done.seat}
+                {formatDateLong(done.date)} &middot; {done.slotName} {done.time}
               </b>
               <div>With {t.name}</div>
             </div>
@@ -266,7 +287,7 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
               View my bookings
             </LinkButton>
             <Button block onClick={() => setDone(null)}>
-              Book another seat
+              Book another spot
             </Button>
           </aside>
         ) : (
@@ -293,50 +314,40 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
             ) : (
               <>
                 {rows.map((r) => (
-                  <SlotSeats
+                  <OfficeHourCard
                     key={r.timing.id}
-                    world={world}
                     teacher={t}
                     row={r}
                     date={day}
+                    state={officeHourState(world, t, r, day, me.id)}
                     studentId={me.id}
-                    picked={pick?.timingId === r.timing.id ? pick.seat : null}
-                    onPick={(seat) => {
-                      setPick((p) => (p && p.timingId === r.timing.id && p.seat === seat ? null : { timingId: r.timing.id, seat }))
-                      setProblem('')
+                    composing={composing === r.timing.id}
+                    reason={reason}
+                    onReason={setReason}
+                    onStart={() => {
+                      setComposing(r.timing.id)
+                      setFullFor(null)
+                      setOtherError(null)
                     }}
+                    onBack={() => setComposing(null)}
+                    onConfirm={() => void confirm(r.timing.id)}
+                    confirming={confirming === r.timing.id}
+                    notice={
+                      fullFor === r.timing.id
+                        ? 'That office hour just filled up.'
+                        : otherError?.timingId === r.timing.id
+                          ? otherError.text
+                          : undefined
+                    }
+                    onCancelBooking={cancelHere}
+                    onAskRequest={askForRequest}
                   />
                 ))}
-                <SeatKeys />
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="reason" className="text-[13px] font-bold text-ink2">
-                    What do you want help with?
-                  </label>
-                  <TextArea
-                    id="reason"
-                    rows={3}
-                    maxLength={REASON_MAX}
-                    aria-describedby="reason-count"
-                    placeholder={'For example, I don’t understand problems 12 to 18'}
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                  />
-                  <div className="flex justify-between text-[13px] text-muted">
-                    <span>At least 10 characters.</span>
-                    <span id="reason-count" className="tabular-nums">
-                      {reason.length} / {REASON_MAX}
-                    </span>
-                  </div>
-                </div>
-                <div className="rounded-xl bg-soft px-3.5 py-3 text-sm font-semibold leading-[1.6] text-ink2">{summary}</div>
-                <ErrorText>{problem || booking.error}</ErrorText>
-                <Button variant="primary" loading={booking.isPending('book')} onClick={() => void confirm()}>
-                  Confirm booking
-                </Button>
+                <ErrorText>{cancelling.error}</ErrorText>
               </>
             )}
 
-            <div className="flex flex-col gap-3 border-t border-line pt-4">
+            <div ref={requestRef} className="flex flex-col gap-3 border-t border-line pt-4">
               <Button
                 aria-expanded={reqOpen}
                 className="!h-auto self-start !py-2.5 text-center"
@@ -381,7 +392,7 @@ function BookSeatFor({ teacher: t }: { teacher: Teacher }) {
   )
 }
 
-export default function BookSeat() {
+export default function BookSpot() {
   const { teacherId } = useParams()
   const { data } = useStudentData()
   const teacher = data.teachers.find((t) => t.id === teacherId)
@@ -399,5 +410,5 @@ export default function BookSeat() {
     )
   }
   // Remount when the teacher changes so the calendar and the form start fresh.
-  return <BookSeatFor key={teacher.id} teacher={teacher} />
+  return <BookSpotFor key={teacher.id} teacher={teacher} />
 }

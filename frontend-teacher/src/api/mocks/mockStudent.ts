@@ -1,6 +1,6 @@
 // Owner: Subgroup B (Teacher desktop UI). Local implementation of the Student API, backed by store.ts.
 // The signed-in student in mock mode is ME_STUDENT. Every action tells the teacher (when it is ME_TEACHER).
-import type { Booking, BookingRequest, Note, StudentSettings, Teacher } from '../../types'
+import type { Booking, BookingRequest, CalendarData, Note, StudentSettings, Teacher } from '../../types'
 import { formatDateShort, formatTime } from '../../lib/dates'
 import { checkBooking, checkBookingReason, checkRequest, findTeacher, hasStarted, timingOf } from '../../lib/rules'
 import { RuleError } from '../errors'
@@ -8,11 +8,10 @@ import { assertOk, delay, pushNote, worldOf } from './actions'
 import { ME_STUDENT, ME_TEACHER } from './seed'
 import { getState, mutate, nextId } from './store'
 
-export interface BookSeatInput {
+export interface BookSpotInput {
   teacherId: string
   date: string
   timingId: string
-  seat: number
   reason: string
 }
 
@@ -30,10 +29,10 @@ export const mockStudentApi = {
   },
 
   /**
-   * Every confirmed booking of every teacher, so seat grids and "open seats" can count seats. Other students'
-   * names and reasons are removed: a student only learns that a seat is taken, never by whom.
+   * Every confirmed booking of every teacher, so "how full is it" can be counted. Other students' names and reasons
+   * are removed: a student only learns that a spot is taken, never by whom.
    */
-  async getSeatBookings(): Promise<Booking[]> {
+  async getSpotBookings(): Promise<Booking[]> {
     await delay()
     return getState()
       .bookings.filter((b) => b.status === 'confirmed')
@@ -51,10 +50,21 @@ export const mockStudentApi = {
     return getState().requests.filter((r) => r.studentId === ME_STUDENT)
   },
 
-  async bookSeat(input: BookSeatInput): Promise<Booking> {
+  /** This student's bookings (every status) and requests between two dates, inclusive, across all teachers. */
+  async getCalendar(from: string, to: string): Promise<CalendarData> {
+    await delay()
+    const s = getState()
+    const within = (date: string) => date >= from && date <= to
+    return {
+      bookings: s.bookings.filter((b) => b.studentId === ME_STUDENT && within(b.date)),
+      requests: s.requests.filter((r) => r.studentId === ME_STUDENT && within(r.date)),
+    }
+  },
+
+  /** Books one of the office hour's spots. The server picks nothing for the student: there are no seat numbers. */
+  async bookSpot(input: BookSpotInput): Promise<Booking> {
     await delay()
     return mutate((d) => {
-      if (!Number.isInteger(input.seat) || input.seat < 1) throw new RuleError('bad_seat', 'Pick a seat first.')
       assertOk(checkBookingReason(input.reason))
       assertOk(checkBooking(worldOf(d), { ...input, studentId: ME_STUDENT }, new Date()))
       const t = findTeacher(worldOf(d), input.teacherId)!
@@ -64,15 +74,15 @@ export const mockStudentApi = {
         teacherId: t.id,
         date: input.date,
         timingId: x.id,
-        seat: input.seat,
         studentId: ME_STUDENT,
         studentName: d.studentPrefs.name,
         reason: input.reason.trim(),
         status: 'confirmed',
+        createdAt: new Date().toISOString(),
       }
       d.bookings.push(booking)
       if (t.id === ME_TEACHER) {
-        pushNote(d, 'teacher', `${booking.studentName} booked Seat ${booking.seat} in ${x.name} on ${formatDateShort(booking.date)}.`, d.teacherPrefs.booking)
+        pushNote(d, 'teacher', `${booking.studentName} booked ${x.name} on ${formatDateShort(booking.date)}.`, d.teacherPrefs.booking)
       }
       return booking
     })
@@ -90,7 +100,7 @@ export const mockStudentApi = {
         pushNote(
           d,
           'teacher',
-          `${b.studentName} cancelled Seat ${b.seat} in ${x?.name ?? 'an office hour'} on ${formatDateShort(b.date)}. The seat is open again.`,
+          `${b.studentName} cancelled their booking in ${x?.name ?? 'an office hour'} on ${formatDateShort(b.date)}. A spot is open again.`,
           d.teacherPrefs.cancel,
         )
       }

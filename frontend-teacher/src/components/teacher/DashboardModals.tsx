@@ -10,7 +10,7 @@ import Chip from '../common/Chip'
 import { Empty, Row } from '../common/Card'
 import { ErrorText } from '../common/fields'
 import Modal, { ModalGroup } from '../common/Modal'
-import { DateBlock, SeatsEnd } from '../common/SeatDots'
+import { DateBlock, SpotsEnd } from '../common/SpotDots'
 import RequestMini from './RequestMini'
 
 export function UpcomingModal({ onClose }: { onClose: () => void }) {
@@ -39,7 +39,7 @@ export function UpcomingModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal
       title="Upcoming office hours"
-      subtitle={`${plural(list.length, 'office hour')} in the next 8 weeks · ${plural(booked, 'seat')} booked`}
+      subtitle={`${plural(list.length, 'office hour')} in the next 8 weeks · ${plural(booked, 'student')} booked`}
       onClose={onClose}
       footer={
         <>
@@ -68,14 +68,14 @@ export function UpcomingModal({ onClose }: { onClose: () => void }) {
                   <ul className="mt-2 flex list-none flex-col gap-1.5 p-0">
                     {o.row.bookings.map((b) => (
                       <li key={b.id} className="rounded-lg bg-soft px-2.5 py-1.5 text-[13px] leading-[1.4]">
-                        <b>{b.studentName}</b> <span className="text-muted">&middot; Seat {b.seat}</span>
+                        <b>{b.studentName}</b>
                         <span className="block text-ink2">{b.reason}</span>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
-              <SeatsEnd taken={o.row.taken} max={max} />
+              <SpotsEnd taken={o.row.taken} max={max} />
             </Row>
           </div>
         )

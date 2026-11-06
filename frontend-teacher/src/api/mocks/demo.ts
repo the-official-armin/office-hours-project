@@ -46,7 +46,7 @@ export async function runReminders(now: Date = new Date()): Promise<void> {
         pushNote(
           d,
           'teacher',
-          `Today: ${todayRows} office hour${todayRows === 1 ? '' : 's'} still to come, ${todaySeats} seat${todaySeats === 1 ? '' : 's'} booked.`,
+          `Today: ${todayRows} office hour${todayRows === 1 ? '' : 's'} still to come, ${todaySeats} student${todaySeats === 1 ? '' : 's'} booked.`,
           d.teacherPrefs.morning,
           `morning:${today}`,
         )
@@ -63,7 +63,7 @@ export async function runReminders(now: Date = new Date()): Promise<void> {
       pushNote(
         d,
         'student',
-        `Reminder: ${t.name}’s ${x.name} starts at ${formatTime(x.start)}. You have Seat ${b.seat}.`,
+        `Reminder: ${t.name}’s ${x.name} starts at ${formatTime(x.start)}. You are booked.`,
         d.studentPrefs.remind,
         `reminder:${b.id}:${d.studentPrefs.lead}`,
       )

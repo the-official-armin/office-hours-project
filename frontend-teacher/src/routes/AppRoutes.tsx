@@ -7,9 +7,10 @@ import TeacherLayout from '../components/teacher/TeacherLayout'
 import { useAuth } from '../hooks/useAuth'
 import AdminDashboard from '../pages/admin/AdminDashboard'
 import Login from '../pages/auth/Login'
-import BookSeat from '../pages/student/BookSeat'
+import BookSpot from '../pages/student/BookSpot'
 import FindTeacher from '../pages/student/FindTeacher'
 import MyBookings from '../pages/student/MyBookings'
+import MyCalendar from '../pages/student/MyCalendar'
 import StudentHome from '../pages/student/StudentHome'
 import StudentSettings from '../pages/student/StudentSettings'
 import BookingRequests from '../pages/teacher/BookingRequests'
@@ -54,8 +55,9 @@ export default function AppRoutes() {
       <Route element={<RequireRole role="student" />}>
         <Route path="/student" element={<StudentLayout />}>
           <Route index element={<StudentHome />} />
+          <Route path="calendar" element={<MyCalendar />} />
           <Route path="teachers" element={<FindTeacher />} />
-          <Route path="teachers/:teacherId" element={<BookSeat />} />
+          <Route path="teachers/:teacherId" element={<BookSpot />} />
           <Route path="bookings" element={<MyBookings />} />
           <Route path="settings" element={<StudentSettings />} />
         </Route>

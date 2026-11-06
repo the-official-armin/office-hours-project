@@ -1,4 +1,4 @@
-// Owner: Subgroup B (Teacher desktop UI). Purpose: the student's seats (upcoming and past) and their requests for a
+// Owner: Subgroup B (Teacher desktop UI). Purpose: the student's bookings (upcoming and past) and their requests for a
 // different time. Cancelling asks first. Bookings the teacher disrupted are flagged, never removed.
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -8,7 +8,7 @@ import { ConfirmBar } from '../../components/common/Banner'
 import Chip from '../../components/common/Chip'
 import { ErrorText } from '../../components/common/fields'
 import PageHeader from '../../components/common/PageHeader'
-import { DateBlock } from '../../components/common/SeatDots'
+import { DateBlock } from '../../components/common/SpotDots'
 import { myWorld, useStudentData } from '../../hooks/StudentData'
 import { useAction } from '../../hooks/useAction'
 import { formatDateShort, formatRange, formatTime } from '../../lib/dates'
@@ -81,13 +81,13 @@ export default function MyBookings() {
     })
     if (done) {
       setCancelId('')
-      setMessage(`Booking cancelled. ${t?.name ?? 'Your teacher'} was told and the seat is open again.`)
+      setMessage(`Booking cancelled. ${t?.name ?? 'Your teacher'} was told and a spot is open again.`)
     }
   }
 
   return (
     <>
-      <PageHeader title="My bookings" subtitle="Your seats, and the requests you sent for other times." />
+      <PageHeader title="My bookings" subtitle="Your bookings, and the requests you sent for other times." />
 
       <Card aria-label="Bookings" className="flex flex-col gap-2">
         <div className="flex flex-wrap gap-2 pb-2" role="group" aria-label="Show">
@@ -130,8 +130,7 @@ export default function MyBookings() {
                   <DateBlock date={b.date} />
                   {line(b)}
                   <div className="flex flex-col items-start gap-1.5">
-                    <Chip>Seat {b.seat}</Chip>
-                    {dis && <Chip kind="amber">{DISRUPT_TEXT[dis]}</Chip>}
+                    {dis ? <Chip kind="amber">{DISRUPT_TEXT[dis]}</Chip> : <Chip>Booked</Chip>}
                   </div>
                   {!asking && (
                     <Button
@@ -150,7 +149,7 @@ export default function MyBookings() {
                   )}
                   {asking && (
                     <div className="basis-full">
-                      <ConfirmBar message={`Cancel this booking? ${t?.name} will be told, and your seat opens up for other students.`}>
+                      <ConfirmBar message={`Cancel this booking? ${t?.name} will be told, and your spot opens up for other students.`}>
                         <Button ref={yesRef} variant="dangerfill" loading={isPending(b.id)} onClick={() => void cancelBookingNow(b)}>
                           Yes, cancel
                         </Button>

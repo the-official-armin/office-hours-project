@@ -6,7 +6,7 @@
 // Booking rules (a student can NOT book):
 //   - a past date, or an office hour that has already started
 //   - a teacher's day off
-//   - a full office hour, a seat already taken, or a second seat in the same office hour
+//   - a full office hour, or a second spot in the same office hour
 //   - an office hour that overlaps another of their bookings in time, with any teacher
 // Existing bookings are flagged when disrupted, never auto-cancelled.
 import type {
@@ -71,6 +71,15 @@ export interface SlotRow {
   started: boolean
 }
 
+/**
+ * Booking order: oldest first. Uses `createdAt` when both bookings have it; the backend does not send it yet, so
+ * otherwise it falls back to the id (numeric ids compare as numbers, "9" before "10").
+ */
+export function byBookingOrder(a: Booking, b: Booking): number {
+  if (a.createdAt && b.createdAt && a.createdAt !== b.createdAt) return a.createdAt.localeCompare(b.createdAt)
+  return a.id.localeCompare(b.id, undefined, { numeric: true })
+}
+
 /** The office hours a teacher holds on a date, with who is booked. */
 export function slotRows(w: World, t: Teacher, date: string, now: Date): SlotRow[] {
   return t.timings
@@ -79,7 +88,7 @@ export function slotRows(w: World, t: Teacher, date: string, now: Date): SlotRow
     .map((timing) => {
       const bookings = w.bookings
         .filter((b) => b.teacherId === t.id && b.date === date && b.timingId === timing.id && isConfirmed(b))
-        .sort((a, b) => a.seat - b.seat)
+        .sort(byBookingOrder)
       return {
         timing,
         bookings,
@@ -152,7 +161,7 @@ export function disruption(w: World, b: Booking): Disruption | null {
   return null
 }
 
-// ---------------------------------------------------------------- booking a seat
+// ---------------------------------------------------------------- booking a spot
 
 /** Another confirmed booking of this student that overlaps `timing` on `date`, with any teacher. */
 export function conflictingBooking(
@@ -174,25 +183,23 @@ export interface BookingAttempt {
   teacherId: string
   date: string
   timingId: string
-  seat: number
   studentId: string
 }
 
+/**
+ * Order of the checks matters: it decides which message a person sees. It is the backend's order (full before
+ * already_booked), so the mock and the real server answer the same. The Book page does not depend on it for a
+ * student who already holds a spot: it looks at their own bookings first (see officeHourState).
+ */
 export function checkBooking(w: World, a: BookingAttempt, now: Date): Check {
   const t = findTeacher(w, a.teacherId)
   const x = t?.timings.find((y) => y.id === a.timingId)
   if (!t || !x || !runsOn(x, a.date)) return fail('no_office_hour', 'That office hour does not exist.')
   if (isOff(t, a.date)) return fail('day_off', `${t.name} is out on ${formatDateLong(a.date)}.`)
   if (hasStarted(a.date, x.start, now)) return fail('past', 'That office hour has already started. Pick a later one.')
-  if (!Number.isInteger(a.seat) || a.seat < 1 || a.seat > t.max) return fail('bad_seat', 'Pick a seat first.')
-  const taken = w.bookings.some(
-    (b) => b.teacherId === t.id && b.date === a.date && b.timingId === x.id && isConfirmed(b) && b.seat === a.seat,
-  )
-  if (taken) return fail('seat_taken', 'Someone just took that seat. Pick another one.')
-  const mine = w.bookings.find(
-    (b) => b.studentId === a.studentId && isConfirmed(b) && b.teacherId === t.id && b.date === a.date && b.timingId === x.id,
-  )
-  if (mine) return fail('already_booked', `You already have Seat ${mine.seat} in this office hour.`)
+  const here = w.bookings.filter((b) => b.teacherId === t.id && b.date === a.date && b.timingId === x.id && isConfirmed(b))
+  if (here.length >= t.max) return fail('full', 'That office hour is full. Pick another one.')
+  if (here.some((b) => b.studentId === a.studentId)) return fail('already_booked', 'You already have a booking in this office hour.')
   const clash = conflictingBooking(w, a.studentId, a.date, x, t.id)
   if (clash) {
     const other = findTeacher(w, clash.teacherId)
@@ -244,14 +251,33 @@ export function checkAccept(w: World, r: BookingRequest, now: Date): Check {
 
 // ---------------------------------------------------------------- seats per office hour
 
-/** The highest seat number held in any upcoming booking: seats cannot drop below this. */
-export function minSeats(w: World, teacherId: string, now: Date): number {
-  let m = MIN_SEATS
-  for (const b of upcomingBookings(w, (x) => x.teacherId === teacherId, now)) if (b.seat > m) m = b.seat
-  return m
+/** The most students booked into any ONE upcoming office hour, and how many office hours have exactly that many. */
+export function fullestOfficeHour(w: World, teacherId: string, now: Date): { count: number; hours: number } {
+  const counts = new Map<string, number>()
+  for (const b of upcomingBookings(w, (x) => x.teacherId === teacherId, now)) {
+    const key = `${b.date}|${b.timingId}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  let count = 0
+  for (const n of counts.values()) if (n > count) count = n
+  const hours = count === 0 ? 0 : [...counts.values()].filter((n) => n === count).length
+  return { count, hours }
 }
 
-/** One click on the stepper. `blocked` means a "-" click was refused because a student holds that seat. */
+/** Seats per office hour cannot go below the fullest upcoming office hour. */
+export function minSeats(w: World, teacherId: string, now: Date): number {
+  return Math.max(MIN_SEATS, fullestOfficeHour(w, teacherId, now).count)
+}
+
+/** "3 is the lowest right now. One upcoming office hour already has 3 students booked." */
+export function floorNote(w: World, teacherId: string, now: Date): string {
+  const { count, hours } = fullestOfficeHour(w, teacherId, now)
+  const who = `${count} ${count === 1 ? 'student' : 'students'} booked`
+  const where = hours === 1 ? 'One upcoming office hour already has' : `${hours} upcoming office hours already have`
+  return `${count} is the lowest right now. ${where} ${who}.`
+}
+
+/** One click on the stepper. `blocked` means a "-" click was refused because an office hour already has that many students. */
 export function stepSeats(current: number, delta: number, floor: number): { max: number; blocked: boolean } {
   if (delta < 0 && current <= floor && floor > MIN_SEATS) return { max: current, blocked: true }
   return { max: Math.max(MIN_SEATS, Math.min(MAX_SEATS, current + delta)), blocked: false }
@@ -294,9 +320,7 @@ export function checkHours(w: World, teacherId: string, input: HoursInput, now: 
     return fail('invalid', `Seats per office hour must be between ${MIN_SEATS} and ${MAX_SEATS}.`)
   }
   const floor = minSeats(w, teacherId, now)
-  if (input.max < floor) {
-    return fail('seat_floor', `A student already holds Seat ${floor}, so seats cannot go below ${floor}.`)
-  }
+  if (input.max < floor) return fail('seat_floor', floorNote(w, teacherId, now))
   return OK
 }
 
@@ -396,13 +420,13 @@ export interface StudentDay {
   rows: SlotRow[]
   /** The day can be opened: not past, not a day off, and the teacher holds office hours. */
   selectable: boolean
-  /** Open seats left in office hours that have not started. */
+  /** Open spots left in office hours that have not started. */
   left: number
   /** At least one office hour has not started yet. */
   bookable: boolean
-  /** The student already holds a seat this day. */
+  /** The student already holds a spot this day. */
   mine: boolean
-  /** Bookable, but no seats left anywhere. */
+  /** Bookable, but no spots left anywhere. */
   full: boolean
 }
 
@@ -427,4 +451,23 @@ export function studentDay(w: World, t: Teacher, date: string, now: Date, studen
 /** The first day from `from` on with an office hour that can still be booked, or `from` when there is none. */
 export function firstBookableDay(w: World, t: Teacher, from: string, now: Date): string {
   return listSlots(w, t, from, 120, now)[0]?.date ?? from
+}
+
+/** What a student can do about one office hour on the Book page. */
+export type OfficeHourState =
+  | { kind: 'bookable' }
+  | { kind: 'full' }
+  | { kind: 'booked'; booking: Booking }
+  | { kind: 'started' }
+  | { kind: 'clash'; with: Booking; teacher: Teacher | undefined }
+
+/** Started wins over everything; then already booked; then a time clash; then full; otherwise bookable. */
+export function officeHourState(w: World, t: Teacher, row: SlotRow, date: string, studentId: string): OfficeHourState {
+  if (row.started) return { kind: 'started' }
+  const mine = row.bookings.find((b) => b.studentId === studentId)
+  if (mine) return { kind: 'booked', booking: mine }
+  const clash = conflictingBooking(w, studentId, date, row.timing, t.id)
+  if (clash) return { kind: 'clash', with: clash, teacher: findTeacher(w, clash.teacherId) }
+  if (row.left <= 0) return { kind: 'full' }
+  return { kind: 'bookable' }
 }

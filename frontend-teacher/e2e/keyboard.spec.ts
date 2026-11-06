@@ -1,4 +1,4 @@
-// Keyboard-only behavior: dialogs, the notification popover, the sidebar shortcut, the seat picker, the theme picker.
+// Keyboard-only behavior: dialogs, the notification popover, the sidebar shortcut, booking a spot, the theme picker.
 import { expect, test, type Page } from '@playwright/test'
 
 async function signIn(page: Page, role: 'teacher' | 'student') {
@@ -53,28 +53,60 @@ test('Ctrl+B hides and shows the sidebar, and the choice is remembered', async (
   await expect(page.getByRole('button', { name: 'Hide navigation' })).toHaveAttribute('aria-expanded', 'true')
 })
 
-test('a student can book a seat with the keyboard alone', async ({ page }) => {
+test('a student can book a spot with the keyboard alone', async ({ page }) => {
   await signIn(page, 'student')
   await page.goto('/student/teachers/rivera')
-  await expect(page.getByRole('heading', { name: /Book a seat with Ms\. Rivera/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Book a spot with Ms\. Rivera/ })).toBeVisible()
 
-  // Some office hours are locked (you already hold a seat there), so pick an enabled seat.
-  const seat = page.locator('button[aria-label$=", open"]:enabled').first()
-  await seat.focus()
-  await page.keyboard.press('Space')
-  await expect(page.getByRole('button', { name: /^Seat \d+, picked$/ })).toHaveCount(1)
+  // Some office hours are not bookable (already booked, full, started), so take the first enabled "Book a spot".
+  const book = page.getByRole('button', { name: 'Book a spot', exact: true }).and(page.locator(':enabled')).first()
+  await book.focus()
+  await page.keyboard.press('Enter')
 
-  await page.getByLabel('What do you want help with?').focus()
+  // The reason form opens in place and takes focus.
+  const reason = page.getByLabel('What do you want help with?')
+  await expect(reason).toBeFocused()
   await page.keyboard.type('Help with the graphing project')
   await expect(page.getByText(/\d+ \/ 300/)).toContainText('30 / 300')
 
-  const confirm = page.getByRole('button', { name: 'Confirm booking' })
-  await confirm.focus()
+  await page.getByRole('button', { name: 'Confirm booking' }).focus()
   await page.keyboard.press('Enter')
 
-  const done = page.getByRole('heading', { name: /booked/ })
+  const done = page.getByRole('heading', { name: /You.re booked/ })
   await expect(done).toBeVisible()
   await expect(done).toBeFocused()
+})
+
+test('Back closes the reason form without booking anything', async ({ page }) => {
+  await signIn(page, 'student')
+  await page.goto('/student/teachers/rivera')
+  const book = page.getByRole('button', { name: 'Book a spot', exact: true }).and(page.locator(':enabled')).first()
+  await book.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByLabel('What do you want help with?')).toBeFocused()
+  await page.getByRole('button', { name: 'Back' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByLabel('What do you want help with?')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Book a spot', exact: true }).first()).toBeVisible()
+})
+
+test('a booked office hour can be cancelled from the Book page by keyboard', async ({ page }) => {
+  await signIn(page, 'student')
+  // The example data books Maya on Ms. Rivera's first Tuesday or Thursday after today.
+  const next = new Date()
+  do next.setDate(next.getDate() + 1)
+  while (![2, 4].includes(next.getDay()))
+  const day = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+  await page.goto(`/student/teachers/rivera?day=${day}`)
+  const cancel = page.getByRole('button', { name: /^Cancel your booking in/ }).first()
+  await expect(cancel).toBeVisible()
+  await cancel.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', { name: 'Yes, cancel' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', { name: 'Yes, cancel' })).toHaveCount(0)
+  // The "You're booked ✓" chip is gone. (The same day can show a clash note about another teacher, so match the chip.)
+  await expect(page.getByText(/You.re booked ✓/)).toHaveCount(0)
 })
 
 test('a booking can be cancelled by keyboard, with an inline confirmation', async ({ page }) => {

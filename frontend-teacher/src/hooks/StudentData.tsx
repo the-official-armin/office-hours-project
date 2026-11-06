@@ -1,10 +1,10 @@
 // Owner: Subgroup B (Teacher desktop UI). One place that loads Student data through src/api/ and refreshes it after writes.
 // Data flow: pages -> useStudent() -> api/student.ts. Pages never call fetch or touch storage.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { studentApi, type BookSeatInput, type SendRequestInput } from '../api/student'
+import { studentApi, type BookSpotInput, type SendRequestInput } from '../api/student'
 import { USE_MOCKS } from '../api/client'
 import { resetExample, runReminders } from '../api/mocks/demo'
-import type { Booking, BookingRequest, Note, ShellData, StudentSettings, Teacher } from '../types'
+import type { Booking, BookingRequest, CalendarData, Note, ShellData, StudentSettings, Teacher } from '../types'
 import { disruption, upcomingBookings, type World } from '../lib/rules'
 
 export interface StudentData {
@@ -12,8 +12,8 @@ export interface StudentData {
   settings: StudentSettings
   /** This student's bookings, every status. */
   bookings: Booking[]
-  /** Every confirmed booking of every teacher; other students' details are removed. For counting seats. */
-  seatBookings: Booking[]
+  /** Every confirmed booking of every teacher; other students' details are removed. For counting spots. */
+  spotBookings: Booking[]
   /** This student's requests, every status. */
   requests: BookingRequest[]
   notes: Note[]
@@ -24,12 +24,16 @@ export interface StudentContextValue {
   error: string | null
   data: StudentData | null
   now: Date
+  /** Changes after every load, so a page that fetches its own range knows to fetch again. */
+  version: number
   usingMocks: boolean
   refresh: () => Promise<void>
   commit: <T>(write: Promise<T>) => Promise<T>
   markNotesRead: () => Promise<void>
   resetExample: () => Promise<void>
-  bookSeat: (input: BookSeatInput) => Promise<Booking>
+  bookSpot: (input: BookSpotInput) => Promise<Booking>
+  /** The student's bookings and requests between two dates, across all teachers. */
+  getCalendar: (from: string, to: string) => Promise<CalendarData>
   cancelBooking: (id: string) => Promise<void>
   sendRequest: (input: SendRequestInput) => Promise<BookingRequest>
   cancelRequest: (id: string) => Promise<void>
@@ -43,20 +47,22 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<StudentContextValue['status']>('loading')
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
+  const [version, setVersion] = useState(0)
   const alive = useRef(true)
 
   const load = useCallback(async () => {
-    const [teachers, settings, bookings, seatBookings, requests, notes] = await Promise.all([
+    const [teachers, settings, bookings, spotBookings, requests, notes] = await Promise.all([
       studentApi.getTeachers(),
       studentApi.getSettings(),
       studentApi.getBookings(),
-      studentApi.getSeatBookings(),
+      studentApi.getSpotBookings(),
       studentApi.getRequests(),
       studentApi.getNotes(),
     ])
     if (!alive.current) return
-    setData({ teachers, settings, bookings, seatBookings, requests, notes })
+    setData({ teachers, settings, bookings, spotBookings, requests, notes })
     setNow(new Date())
+    setVersion((v) => v + 1)
   }, [])
 
   useEffect(() => {
@@ -104,6 +110,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [load, data])
 
+  const getCalendar = useCallback((from: string, to: string) => studentApi.getCalendar(from, to), [])
+
   const commit = useCallback(
     async <T,>(write: Promise<T>): Promise<T> => {
       const result = await write
@@ -119,18 +127,20 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       error,
       data,
       now,
+      version,
       usingMocks: USE_MOCKS,
       refresh,
       commit,
       markNotesRead: () => commit(studentApi.markNotesRead()),
       resetExample: () => commit(resetExample()),
-      bookSeat: (input) => commit(studentApi.bookSeat(input)),
+      bookSpot: (input) => commit(studentApi.bookSpot(input)),
+      getCalendar,
       cancelBooking: (id) => commit(studentApi.cancelBooking(id)),
       sendRequest: (input) => commit(studentApi.sendRequest(input)),
       cancelRequest: (id) => commit(studentApi.cancelRequest(id)),
       saveSettings: (input) => commit(studentApi.saveSettings(input)),
     }),
-    [status, error, data, now, refresh, commit],
+    [status, error, data, now, version, refresh, commit, getCalendar],
   )
 
   return <StudentContext.Provider value={value}>{children}</StudentContext.Provider>
@@ -149,9 +159,9 @@ export function useStudentData(): StudentContextValue & { data: StudentData } {
   return ctx as StudentContextValue & { data: StudentData }
 }
 
-/** All seats taken, for choosing where to book. Includes this student's own confirmed bookings. */
-export function seatWorld(data: StudentData): World {
-  return { teachers: data.teachers, bookings: data.seatBookings }
+/** Every spot taken, for choosing where to book. Includes this student's own confirmed bookings. */
+export function spotWorld(data: StudentData): World {
+  return { teachers: data.teachers, bookings: data.spotBookings }
 }
 
 /** This student's own bookings (every status), for lists and disruption flags. */

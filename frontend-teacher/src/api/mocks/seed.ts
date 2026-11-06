@@ -86,27 +86,38 @@ export function seedState(now: Date, session: Role | null = null): DemoState {
     teacherId: string,
     date: string,
     timingId: string,
-    seat: number,
     studentName: string,
     studentId: string,
     reason: string,
     status: Booking['status'] = 'confirmed',
-  ) => bookings.push({ id: id('b'), teacherId, date, timingId, seat, studentName, studentId, reason, status })
+  ) =>
+    // Made two days ago, one minute apart, so every office hour lists its students in booking order.
+    bookings.push({
+      id: id('b'),
+      teacherId,
+      date,
+      timingId,
+      studentName,
+      studentId,
+      reason,
+      status,
+      createdAt: new Date(now.getTime() - 2 * 24 * HOUR + bookings.length * 60_000).toISOString(),
+    })
   const ME = 'Maya K.'
 
   /* Ms. Rivera (the teacher view) */
   const riv = fwd([2, 4], 12)
-  add('rivera', riv[0], 'lunch', 1, ME, 'maya', 'Review homework problems 12–18.')
-  add('rivera', riv[0], 'lunch', 2, 'Daniel O.', 'daniel', 'Questions on the graphing project rubric.')
-  add('rivera', riv[0], 'lunch', 3, 'Priya S.', 'priya', 'Not sure how to start the word problems.')
-  add('rivera', riv[0], 'after', 2, 'Ethan W.', 'ethan', 'Wants feedback on his test corrections.')
-  add('rivera', riv[1], 'lunch', 1, 'Hana B.', 'hana', 'Prep for the unit 3 exam.')
-  add('rivera', riv[1], 'lunch', 2, 'Leo M.', 'leo', 'Catch up after missing two classes.')
-  add('rivera', riv[2], 'lunch', 1, 'Noor A.', 'noor', 'Check my work on factoring.')
-  add('rivera', riv[2], 'lunch', 2, 'Jonas R.', 'jonas', 'Study group review for the quiz.')
-  add('rivera', riv[2], 'lunch', 3, 'Zoe T.', 'zoe', 'Retake plan for the last test.')
-  add('rivera', riv[2], 'lunch', 4, 'Ines F.', 'ines', 'Confused about slope-intercept form.')
-  add('rivera', riv[3], 'lunch', 1, 'Tariq A.', 'tariq', 'Help with the extra credit problem.')
+  add('rivera', riv[0], 'lunch', ME, 'maya', 'Review homework problems 12–18.')
+  add('rivera', riv[0], 'lunch', 'Daniel O.', 'daniel', 'Questions on the graphing project rubric.')
+  add('rivera', riv[0], 'lunch', 'Priya S.', 'priya', 'Not sure how to start the word problems.')
+  add('rivera', riv[0], 'after', 'Ethan W.', 'ethan', 'Wants feedback on his test corrections.')
+  add('rivera', riv[1], 'lunch', 'Hana B.', 'hana', 'Prep for the unit 3 exam.')
+  add('rivera', riv[1], 'lunch', 'Leo M.', 'leo', 'Catch up after missing two classes.')
+  add('rivera', riv[2], 'lunch', 'Noor A.', 'noor', 'Check my work on factoring.')
+  add('rivera', riv[2], 'lunch', 'Jonas R.', 'jonas', 'Study group review for the quiz.')
+  add('rivera', riv[2], 'lunch', 'Zoe T.', 'zoe', 'Retake plan for the last test.')
+  add('rivera', riv[2], 'lunch', 'Ines F.', 'ines', 'Confused about slope-intercept form.')
+  add('rivera', riv[3], 'lunch', 'Tariq A.', 'tariq', 'Help with the extra credit problem.')
   byId('rivera').daysOff = [
     { date: riv[3], reason: 'Parent conference day' },
     { date: riv[5], reason: 'Field trip' },
@@ -118,38 +129,38 @@ export function seedState(now: Date, session: Role | null = null): DemoState {
     const d = addDays(monday, i)
     if (d <= t0 && (d.getDay() === 2 || d.getDay() === 4)) {
       const k = toISODate(d)
-      add('rivera', k, 'lunch', 1, 'Mia C.', 'mia', 'Help with the homework set.')
-      add('rivera', k, 'lunch', 2, 'Omar H.', 'omar', 'Quiz retake planning.')
-      add('rivera', k, 'lunch', 3, 'Lena V.', 'lena', 'Check my graphs.')
-      add('rivera', k, 'after', 1, 'Sam D.', 'sam', 'Review the unit test.')
+      add('rivera', k, 'lunch', 'Mia C.', 'mia', 'Help with the homework set.')
+      add('rivera', k, 'lunch', 'Omar H.', 'omar', 'Quiz retake planning.')
+      add('rivera', k, 'lunch', 'Lena V.', 'lena', 'Check my graphs.')
+      add('rivera', k, 'after', 'Sam D.', 'sam', 'Review the unit test.')
     }
   }
 
   /* other teachers */
   const ok = fwd([2, 5], 6)
-  add('okafor', ok[0], 'lunch', 1, 'Daniel O.', 'daniel', 'Lab report questions.')
-  add('okafor', ok[0], 'lunch', 2, 'Hana B.', 'hana', 'Review moles and molar mass.')
-  add('okafor', ok[1], 'lunch', 1, 'Leo M.', 'leo', 'Catch up on the titration lab.')
-  add('okafor', ok[1], 'lunch', 3, ME, 'maya', 'Questions about balancing equations.')
-  add('okafor', ok[2], 'lunch', 2, 'Noor A.', 'noor', 'Study for the unit test.')
+  add('okafor', ok[0], 'lunch', 'Daniel O.', 'daniel', 'Lab report questions.')
+  add('okafor', ok[0], 'lunch', 'Hana B.', 'hana', 'Review moles and molar mass.')
+  add('okafor', ok[1], 'lunch', 'Leo M.', 'leo', 'Catch up on the titration lab.')
+  add('okafor', ok[1], 'lunch', ME, 'maya', 'Questions about balancing equations.')
+  add('okafor', ok[2], 'lunch', 'Noor A.', 'noor', 'Study for the unit test.')
   const br = fwd([2, 4], 6)
-  ;['Jonas R.', 'Zoe T.', 'Ines F.', 'Tariq A.'].forEach((name, i) =>
-    add('brooks', br[0], 'lunch', i + 1, name, name.split(' ')[0].toLowerCase(), 'Cell structure review.'),
+  ;['Jonas R.', 'Zoe T.', 'Ines F.', 'Tariq A.'].forEach((name) =>
+    add('brooks', br[0], 'lunch', name, name.split(' ')[0].toLowerCase(), 'Cell structure review.'),
   )
-  add('brooks', br[1], 'lunch', 1, 'Mia C.', 'mia', 'Help with the genetics worksheet.')
+  add('brooks', br[1], 'lunch', 'Mia C.', 'mia', 'Help with the genetics worksheet.')
   const li = fwd([2, 5], 6)
-  add('lindqvist', li[1], 'after', 1, 'Omar H.', 'omar', 'Feedback on my essay draft.')
+  add('lindqvist', li[1], 'after', 'Omar H.', 'omar', 'Feedback on my essay draft.')
   const al = fwd([3, 4], 6)
-  add('alvarez', al[0], 'lunch', 1, 'Lena V.', 'lena', 'Practice speaking.')
-  add('alvarez', al[2], 'lunch', 2, ME, 'maya', 'Practice for the oral exam.')
+  add('alvarez', al[0], 'lunch', 'Lena V.', 'lena', 'Practice speaking.')
+  add('alvarez', al[2], 'lunch', ME, 'maya', 'Practice for the oral exam.')
   byId('alvarez').daysOff = [{ date: al[2], reason: 'Curriculum day' }]
   const ta = fwd([1, 3], 6)
-  add('tanaka', ta[1], 'after', 1, 'Sam D.', 'sam', 'Essay outline help.')
+  add('tanaka', ta[1], 'after', 'Sam D.', 'sam', 'Essay outline help.')
 
   /* Maya's history */
-  add('rivera', back([2], 1)[0], 'lunch', 2, ME, 'maya', 'Help with the chapter 3 quiz.')
-  add('okafor', back([5], 1)[0], 'lunch', 1, ME, 'maya', 'Lab safety questions.')
-  add('lindqvist', back([2, 5], 4)[3], 'after', 3, ME, 'maya', 'Feedback on my essay outline.', 'cancelled')
+  add('rivera', back([2], 1)[0], 'lunch', ME, 'maya', 'Help with the chapter 3 quiz.')
+  add('okafor', back([5], 1)[0], 'lunch', ME, 'maya', 'Lab safety questions.')
+  add('lindqvist', back([2, 5], 4)[3], 'after', ME, 'maya', 'Feedback on my essay outline.', 'cancelled')
 
   const requests: BookingRequest[] = []
   const rq = (
@@ -165,7 +176,7 @@ export function seedState(now: Date, session: Role | null = null): DemoState {
   rq('rivera', 'aiden', 'Aiden P.', fwd([3], 1)[0], '15:45', 'Wants to go over the unit test he missed before the make-up date.', 'pending')
   rq('rivera', 'sofia', 'Sofia L.', fwd([5], 1)[0], '12:15', 'Stuck on geometry proofs and needs more time than a lunch slot.', 'pending')
   rq('rivera', 'marcus', 'Marcus T.', fwd([1], 1)[0], '15:30', 'Wants to plan a retake of last quiz.', 'pending')
-  rq('okafor', 'maya', ME, fwd([5], 1)[0], '15:45', 'Can I get feedback on my lab report draft? None of the lunch seats fit my schedule.', 'pending')
+  rq('okafor', 'maya', ME, fwd([5], 1)[0], '15:45', 'Can I get feedback on my lab report draft? None of the lunch spots fit my schedule.', 'pending')
   rq('alvarez', 'maya', ME, back([3], 1)[0], '16:00', 'Extra practice before the vocabulary test.', 'accepted', 'Ms. Alvarez accepted this time.')
   rq('lindqvist', 'maya', ME, back([1], 1)[0], '15:30', 'Talk through my thesis statement.', 'declined', 'Dr. Lindqvist: “I’m out Mondays. Please use Tuesday or Friday.”')
 
@@ -178,7 +189,7 @@ export function seedState(now: Date, session: Role | null = null): DemoState {
     ],
     teacher: [
       note(`Marcus T. sent a request for ${formatDateShort(fwd([1], 1)[0])} at ${formatTime('15:30')}.`, 1, false),
-      note(`Hana B. booked Seat 1 in Lunch on ${formatDateShort(riv[1])}.`, 5, false),
+      note(`Hana B. booked Lunch on ${formatDateShort(riv[1])}.`, 5, false),
       note(`Sofia L. sent a request for ${formatDateShort(fwd([5], 1)[0])} at ${formatTime('12:15')}.`, 26, true),
     ],
   }

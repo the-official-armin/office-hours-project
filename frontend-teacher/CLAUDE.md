@@ -1,6 +1,6 @@
 # CLAUDE.md (frontend-teacher)
 
-Washington Prep Office Hours: students book office-hour seats with teachers; teachers set their schedule, days off and
+Washington Prep Office Hours: students book a spot in an office hour with teachers; teachers set their schedule, days off and
 answer requests. Frontend only. A separate team owns the FastAPI backend. Do not write backend code here.
 
 ## Stack
@@ -48,9 +48,9 @@ real login), build the Alma integration, or write backend code.
 
 ## Status
 - [x] Teacher: Dashboard, Calendar, Office hours, Days off, Booking requests, Settings
-- [x] Student: Home, Find a teacher, Book a seat, My bookings, Settings
+- [x] Student: Home, My calendar, Find a teacher, Book a spot (no seat numbers), My bookings, Settings
 - [x] Themes (3 palettes, light / dark / system), fixed sidebar
 - [ ] Put the school crest at `public/school-logo.png`
-- [ ] Update `docs/api-contract.md` to the current endpoints
+- [x] `docs/api-contract.md` matches the current endpoints; `docs/backend-connection-report.md` lists what the backend still has to build
 - [ ] Switch from mocks to the real API
 - [ ] Real login wired to the auth team's JWT

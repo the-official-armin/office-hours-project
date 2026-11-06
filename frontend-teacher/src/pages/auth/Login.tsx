@@ -20,7 +20,7 @@ export default function Login() {
         <div>
           <h1 className="text-[28px] font-extrabold tracking-tight">Washington Prep Office Hours</h1>
           <p className="mt-1.5 text-[15px] text-muted">
-            Book a seat with a teacher, or manage your office hours. Pick a side to look around.
+            Book a spot with a teacher, or manage your office hours. Pick a side to look around.
           </p>
         </div>
 

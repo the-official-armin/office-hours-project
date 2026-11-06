@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test'
 test.use({ viewport: { width: 390, height: 844 } })
 
 const TEACHER = ['', '/calendar', '/office-hours', '/days-off', '/requests?tab=requests', '/requests?tab=bookings', '/settings']
-const STUDENT = ['', '/teachers', '/teachers/rivera', '/bookings?tab=up', '/bookings?tab=past', '/bookings?tab=req', '/settings']
+const STUDENT = ['', '/calendar', '/teachers', '/teachers/rivera', '/bookings?tab=up', '/bookings?tab=past', '/bookings?tab=req', '/settings']
 
 async function signIn(page: Page, role: 'teacher' | 'student') {
   await page.goto('/login')
