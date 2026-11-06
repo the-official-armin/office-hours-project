@@ -59,6 +59,7 @@ STUDENTS = {
     "aiden": ("Aiden P.", "Grade 10"),
     "sofia": ("Sofia L.", "Grade 10"),
     "marcus": ("Marcus T.", "Grade 10"),
+    "alex": ("Alex R.", "Grade 10"),
 }
 
 
@@ -151,7 +152,9 @@ def seed(db: Session, now: datetime = None) -> None:
     add("okafor", ok[0], "lunch", "daniel", "Lab report questions.")
     add("okafor", ok[0], "lunch", "hana", "Review moles and molar mass.")
     add("okafor", ok[1], "lunch", "leo", "Catch up on the titration lab.")
-    add("okafor", ok[1], "lunch", ME, "Questions about balancing equations.")
+    # Kept off next Tuesday: on Tue–Thu the second Tue/Fri IS next Tuesday, and it
+    # would clash with Maya's seeded Rivera lunch (same time) and break re-booking.
+    add("okafor", ok[2], "lunch", ME, "Questions about balancing equations.")
     add("okafor", ok[2], "lunch", "noor", "Study for the unit test.")
     br = fwd(t0, [2, 4], 6)
     for sid in ["jonas", "zoe", "ines", "tariq"]:

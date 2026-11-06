@@ -38,6 +38,14 @@ def test_teacher_login_and_me(client):
     assert me.json() == body["user"]
 
 
+def test_second_demo_student_can_log_in(client):
+    res = client.post("/auth/login", json={
+        "role": "student", "userId": "alex", "password": "demo-password",
+    })
+    assert res.status_code == 200
+    assert res.json()["user"]["name"] == "Alex R."
+
+
 def test_login_rejects_bad_password(client):
     res = client.post("/auth/login", json={
         "role": "student", "userId": "maya", "password": "wrong",
@@ -82,6 +90,20 @@ def test_book_happy_path(client):
     assert body["studentName"] == "Maya K."
     assert body["timingId"] == "lunch"
     assert "seat" not in body
+    assert body["createdAt"]
+
+
+def test_booking_date_filter_is_inclusive(client):
+    body = client.get(
+        "/bookings",
+        params={"view": "student", "from": NEXT_TUE.isoformat(), "to": NEXT_TUE.isoformat()},
+    ).json()
+    assert body
+    assert all(item["date"] == NEXT_TUE.isoformat() for item in body)
+    assert client.get(
+        "/bookings",
+        params={"view": "student", "from": NEXT_TUE.isoformat(), "to": (NEXT_TUE - timedelta(days=1)).isoformat()},
+    ).json()["code"] == "invalid"
 
 
 def test_book_full(client):
@@ -135,6 +157,15 @@ def test_booking_notifies_teacher(client):
     _book(client, date=NEXT_THU)
     notes = client.get("/notifications?view=teacher").json()
     assert any("booked a spot in Lunch" in n["text"] for n in notes)
+
+
+def test_request_date_filter_is_inclusive(client):
+    body = client.get(
+        "/requests",
+        params={"view": "teacher", "from": NEXT_MON.isoformat(), "to": NEXT_MON.isoformat()},
+    ).json()
+    assert body
+    assert all(item["date"] == NEXT_MON.isoformat() for item in body)
 
 
 # ---------------------------------------------------------------- schedule

@@ -6,6 +6,9 @@
   reasons removed (the public occupancy view: how full each office hour is).
 - POST /bookings: the student books a spot. DELETE /bookings/{id}: the student cancels.
 """
+from datetime import date
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session, joinedload
 
@@ -37,17 +40,29 @@ def _query(db: Session):
 
 @router.get("/bookings")
 def list_bookings(view: str = Query(pattern="^(teacher|student|open)$"),
+                  from_date: Optional[date] = Query(default=None, alias="from"),
+                  to_date: Optional[date] = Query(default=None, alias="to"),
                   db: Session = Depends(get_db),
                   teacher: Teacher = Depends(current_teacher),
                   student: Student = Depends(current_student)):
+    if from_date is not None and to_date is not None and from_date > to_date:
+        raise RuleError("invalid", "The from date must be on or before the to date.")
+    date_filter = []
+    if from_date is not None:
+        date_filter.append(Booking.date >= from_date)
+    if to_date is not None:
+        date_filter.append(Booking.date <= to_date)
     if view == "open":
         # The public occupancy view: a student only learns that a spot is taken, never by whom.
-        rows = _query(db).filter(Booking.status == "confirmed").order_by(Booking.date, Booking.id).all()
+        rows = _query(db).filter(Booking.status == "confirmed", *date_filter).order_by(
+            Booking.date, Booking.created_at, Booking.id).all()
         return [views.booking_json(b if b.student_id == student.id else _AnonBooking(b)) for b in rows]
     if view == "teacher":
-        rows = _query(db).filter(Booking.teacher_id == teacher.id).order_by(Booking.date, Booking.id).all()
+        rows = _query(db).filter(Booking.teacher_id == teacher.id, *date_filter).order_by(
+            Booking.date, Booking.created_at, Booking.id).all()
     else:
-        rows = _query(db).filter(Booking.student_id == student.id).order_by(Booking.date, Booking.id).all()
+        rows = _query(db).filter(Booking.student_id == student.id, *date_filter).order_by(
+            Booking.date, Booking.created_at, Booking.id).all()
     return [views.booking_json(b) for b in rows]
 
 

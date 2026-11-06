@@ -114,6 +114,7 @@ def booking_json(b) -> dict:
         "studentName": student_name,
         "reason": b.reason,
         "status": b.status,
+        "createdAt": b.created_at.isoformat() if b.created_at is not None else None,
     }
 
 

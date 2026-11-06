@@ -81,9 +81,9 @@ against an existing database so the credential columns are present.
 
 | Method & path | What it does |
 | --- | --- |
-| `GET /bookings?view=open` | **Anonymous occupancy**: every confirmed booking, but other students' names and reasons are blanked — a student only sees how many spots are taken. Powers the "N left" counts. |
-| `GET /bookings?view=student` | The signed-in student's own bookings, every status (upcoming + history + cancelled). |
-| `GET /bookings?view=teacher` | Everything booked with the signed-in teacher, every status. The teacher dashboard and calendar read this. |
+| `GET /bookings?view=open&from=YYYY-MM-DD&to=YYYY-MM-DD` | **Anonymous occupancy**: every confirmed booking, but other students' names and reasons are blanked — a student only sees how many spots are taken. Date filters are optional and inclusive. |
+| `GET /bookings?view=student&from=YYYY-MM-DD&to=YYYY-MM-DD` | The signed-in student's own bookings, every status (upcoming + history + cancelled). Date filters are optional and inclusive. |
+| `GET /bookings?view=teacher&from=YYYY-MM-DD&to=YYYY-MM-DD` | Everything booked with the signed-in teacher, every status. Date filters are optional and inclusive. |
 | `POST /bookings` | The student books a spot: `{ teacherId, date, timingId, reason }`. No seat to pick — each office hour takes up to `max` students. Enforces all booking rules: the office hour must exist on that date (`no_office_hour`), not be a day off (`day_off`), not have started (`past`), must not be full (`full`), not a second booking in the same hour (`already_booked`), and must not clash with another of the student's bookings (`conflict`). The reason needs 10–300 characters (`reason`). The teacher is notified. Returns the created `Booking`. |
 | `DELETE /bookings/{id}` | The student cancels a confirmed booking (204); the teacher is notified. Refused once the office hour has started (`past`). 404 if already cancelled. |
 
@@ -91,8 +91,8 @@ against an existing database so the credential columns are present.
 
 | Method & path | What it does |
 | --- | --- |
-| `GET /requests?view=teacher` | Requests sent to the signed-in teacher, sorted by date and time. The booking-requests page reads this. |
-| `GET /requests?view=student` | The signed-in student's own requests and their answers. |
+| `GET /requests?view=teacher&from=YYYY-MM-DD&to=YYYY-MM-DD` | Requests sent to the signed-in teacher, sorted by date and time. Date filters are optional and inclusive. |
+| `GET /requests?view=student&from=YYYY-MM-DD&to=YYYY-MM-DD` | The signed-in student's own requests and their answers. Date filters are optional and inclusive. |
 | `POST /requests` | The student asks for a time outside office hours: `{ teacherId, date, time, reason }`. Rejects past times (`past`), days off (`day_off`) and short reasons (`reason`). The teacher is notified. Returns the pending `BookingRequest`. |
 | `POST /requests/{id}/answer` | The teacher answers: `{ "answer": "accepted" \| "declined" }`. Accepting is refused when the time has passed or is a day off. The student is notified, and the answer lands in the request's `note`. |
 | `DELETE /requests/{id}` | The student withdraws a pending request (204); the teacher is notified. 404 once answered. |
@@ -117,7 +117,7 @@ The JSON mirrors `frontend-teacher/src/types/index.ts`:
 
 - `Teacher`: `{ id, name, subject, group, max, timings: Timing[], daysOff: [{date, reason}] }` — `max` is the capacity: how many students each office hour takes (stored as `capacity` in the DB, exposed as `max` to match the frontend type).
 - `Timing`: `{ id, name, start, end, days }` — `days` are JS weekday numbers (1 = Monday … 5 = Friday); removed timings stay with `gone: true` and `days: []` so old bookings resolve.
-- `Booking`: `{ id, teacherId, date, timingId, studentId, studentName, reason, status }` — no seat number; status is `confirmed` or `cancelled`.
+- `Booking`: `{ id, teacherId, date, timingId, studentId, studentName, reason, status, createdAt }` — `createdAt` is an ISO 8601 timestamp; no seat number; status is `confirmed` or `cancelled`.
 - `BookingRequest`: `{ id, teacherId, studentId, studentName, date, time, reason, status, note }` — status is `pending`, `accepted` or `declined`; `note` is the teacher's answer shown to the student.
 - `Note` (notification): `{ id, text, at, read, key? }` — `at` is epoch milliseconds.
 - Days off reject dates in the past; bookings reject anything at or before "now".
