@@ -9,9 +9,10 @@ The API is organized as **resources shared by both roles**: bookings, requests a
 notifications each live under one path, with a `view` parameter deciding whose data
 you see. Teacher-only things (schedule, days off) sit under `/teacher`.
 
-> Auth is a placeholder until the auth team lands JWT: every endpoint answers for the
-> demo user (`ME_TEACHER_ID=rivera` / `ME_STUDENT_ID=maya`). Swap the dependencies in
-> `app/deps.py` for real JWT ones when login exists.
+Authentication is available through JWT. Existing frontend/demo requests without an
+`Authorization` header continue to use the configured demo identities
+(`ME_TEACHER_ID=rivera` / `ME_STUDENT_ID=maya`); authenticated clients should send
+`Authorization: Bearer <accessToken>`.
 
 ## Quick start
 
@@ -48,6 +49,21 @@ the frontend's `RuleError` expects.
 
 Rule codes: `past`, `day_off`, `no_office_hour`, `full`, `already_booked`, `conflict`,
 `reason`, `duplicate_day_off`, `seat_floor`, `not_found`, `missing`, `invalid`.
+
+### Authentication
+
+Users are stored in the `teachers` and `students` tables. Passwords are stored as
+scrypt hashes, never as plaintext. The demo seed creates every demo account with the
+password `demo-password`; change these credentials before using a deployed database.
+
+| Method & path | What it does |
+| --- | --- |
+| `POST /auth/login` | Accepts `{ "role": "teacher" \| "student", "userId": "<id>", "password": "<password>" }` and returns `{ accessToken, tokenType, expiresIn, user }`. |
+| `GET /auth/me` | Validates a bearer token and returns the authenticated `{ id, role, name }`. |
+
+Set `JWT_SECRET` to a long random value in deployment. Tokens expire after
+`JWT_EXPIRE_MINUTES` (60 by default). Run `alembic upgrade head` before starting
+against an existing database so the credential columns are present.
 
 ### Teachers & schedule
 

@@ -25,6 +25,27 @@ def test_healthz(client):
     assert client.get("/healthz").json() == {"status": "ok"}
 
 
+def test_teacher_login_and_me(client):
+    res = client.post("/auth/login", json={
+        "role": "teacher", "userId": "rivera", "password": "demo-password",
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["tokenType"] == "bearer"
+    assert body["user"] == {"id": "rivera", "role": "teacher", "name": "Ms. Rivera"}
+    me = client.get("/auth/me", headers={"Authorization": "Bearer " + body["accessToken"]})
+    assert me.status_code == 200
+    assert me.json() == body["user"]
+
+
+def test_login_rejects_bad_password(client):
+    res = client.post("/auth/login", json={
+        "role": "student", "userId": "maya", "password": "wrong",
+    })
+    assert res.status_code == 401
+    assert res.json()["code"] == "invalid_credentials"
+
+
 def test_teacher_profile(client):
     body = client.get("/teacher/profile").json()
     assert body["id"] == "rivera"

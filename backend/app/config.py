@@ -11,3 +11,7 @@ ME_STUDENT_ID = os.environ.get("ME_STUDENT_ID", "maya")
 
 # Seed the demo dataset on startup when the database is empty.
 AUTO_SEED = os.environ.get("AUTO_SEED", "true").lower() != "false"
+
+# JWT settings. Set a long random value in deployed environments.
+JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-development-secret")
+JWT_EXPIRE_MINUTES = int(os.environ.get("JWT_EXPIRE_MINUTES", "60"))
