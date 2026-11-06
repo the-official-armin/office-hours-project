@@ -8,6 +8,7 @@ from alembic import context
 
 # This adds your backend folder to the python path so it can find the app package
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from app.config import DATABASE_URL as APP_DATABASE_URL  # noqa: E402
 from app.models import Base  # noqa: E402
 
 # This is the Alembic Config object...
@@ -21,7 +22,8 @@ if config.config_file_name is not None:
 # DATABASE_URL wins over alembic.ini (dev: sqlite file, deploy: docker-compose Postgres).
 config.set_main_option(
     "sqlalchemy.url",
-    os.environ.get("DATABASE_URL", config.get_main_option("sqlalchemy.url")),
+    # app.config also turns a host's "postgres://" into "postgresql://".
+    APP_DATABASE_URL if "DATABASE_URL" in os.environ else config.get_main_option("sqlalchemy.url"),
 )
 
 # add your model's MetaData object here

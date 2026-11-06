@@ -10,12 +10,13 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from .. import rules, views
-from ..deps import current_student, current_teacher, get_db, now_local, push_note
+from ..deps import CurrentUser, check_view, current_student, current_user, get_db, now_local, push_note
 from ..errors import RuleError
-from ..models import Booking, Student, Teacher
+from ..models import Booking, Student, Teacher, Timing
 from ..schemas import BookSeatIn
 from . import common
 
@@ -43,8 +44,8 @@ def list_bookings(view: str = Query(pattern="^(teacher|student|open)$"),
                   from_date: Optional[date] = Query(default=None, alias="from"),
                   to_date: Optional[date] = Query(default=None, alias="to"),
                   db: Session = Depends(get_db),
-                  teacher: Teacher = Depends(current_teacher),
-                  student: Student = Depends(current_student)):
+                  me: CurrentUser = Depends(current_user)):
+    check_view(view, me)
     if from_date is not None and to_date is not None and from_date > to_date:
         raise RuleError("invalid", "The from date must be on or before the to date.")
     date_filter = []
@@ -56,12 +57,12 @@ def list_bookings(view: str = Query(pattern="^(teacher|student|open)$"),
         # The public occupancy view: a student only learns that a spot is taken, never by whom.
         rows = _query(db).filter(Booking.status == "confirmed", *date_filter).order_by(
             Booking.date, Booking.created_at, Booking.id).all()
-        return [views.booking_json(b if b.student_id == student.id else _AnonBooking(b)) for b in rows]
+        return [views.booking_json(b if b.student_id == me.user.id else _AnonBooking(b)) for b in rows]
     if view == "teacher":
-        rows = _query(db).filter(Booking.teacher_id == teacher.id, *date_filter).order_by(
+        rows = _query(db).filter(Booking.teacher_id == me.user.id, *date_filter).order_by(
             Booking.date, Booking.created_at, Booking.id).all()
     else:
-        rows = _query(db).filter(Booking.student_id == student.id, *date_filter).order_by(
+        rows = _query(db).filter(Booking.student_id == me.user.id, *date_filter).order_by(
             Booking.date, Booking.created_at, Booking.id).all()
     return [views.booking_json(b) for b in rows]
 
@@ -72,6 +73,10 @@ def book_seat(body: BookSeatIn, db: Session = Depends(get_db),
     """The student books a spot in one of the teacher's office hours."""
     now = now_local()
     common.assert_check(rules.check_booking_reason(body.reason))
+    # Lock the office hour first (Postgres; SQLite already runs one writer at a time), so two students
+    # booking the last spot at once are counted one after the other and the second one gets "full".
+    db.query(Timing).filter(Timing.teacher_id == body.teacherId,
+                            Timing.key == body.timingId).with_for_update().first()
     common.assert_check(rules.check_booking(common.world(db), body.teacherId, body.date,
                                             body.timingId, student.id, now))
     teacher = common.teacher_or_404(db, body.teacherId)
@@ -85,7 +90,12 @@ def book_seat(body: BookSeatIn, db: Session = Depends(get_db),
         status="confirmed",
     )
     db.add(booking)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # uq_bookings_one_per_student: the same student sent the booking twice at once.
+        db.rollback()
+        raise RuleError("already_booked", "You already have a booking in this office hour.")
     push_note(
         db,
         "%s booked a spot in %s on %s." % (

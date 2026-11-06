@@ -32,3 +32,8 @@ export function teacherInitial(name: string): string {
     .slice(0, 2)
     .toUpperCase()
 }
+
+/** Ends a sentence after a name without doubling a period: "Maya K." -> "Maya K.", "Ms. Rivera" -> "Ms. Rivera." */
+export function endSentence(text: string): string {
+  return text.endsWith('.') ? text : `${text}.`
+}
