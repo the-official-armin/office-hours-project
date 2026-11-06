@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from .config import AUTO_SEED
 from .database import Base, SessionLocal, engine
 from .errors import RuleError, status_for
-from .routers import bookings, notifications, requests, students, teachers
+from .routers import auth, bookings, notifications, requests, students, teachers
 from . import seed as seed_module
 
 
@@ -64,3 +64,4 @@ app.include_router(students.router)
 app.include_router(bookings.router)
 app.include_router(requests.router)
 app.include_router(notifications.router)
+app.include_router(auth.router)

@@ -35,6 +35,7 @@ class Teacher(Base):
 
     # Email/notification preferences (TeacherPrefs in the frontend types).
     email = Column(String, nullable=False, default="")
+    password_hash = Column(String, nullable=False, default="")
     remind = Column(Boolean, nullable=False, default=True)
     booking = Column(Boolean, nullable=False, default=True)
     cancel = Column(Boolean, nullable=False, default=True)
@@ -88,6 +89,7 @@ class Student(Base):
     name = Column(String, nullable=False)
     grade = Column(String, nullable=False, default="")
     email = Column(String, nullable=False, default="")
+    password_hash = Column(String, nullable=False, default="")
 
     # StudentPrefs in the frontend types.
     remind = Column(Boolean, nullable=False, default=True)

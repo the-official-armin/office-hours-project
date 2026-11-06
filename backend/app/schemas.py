@@ -8,6 +8,13 @@ _LEAD_PATTERN = r"^(30 minutes|1 hour|1 day)$"
 
 
 _TIME_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
+_ROLE_PATTERN = r"^(student|teacher)$"
+
+
+class LoginIn(BaseModel):
+    role: str = Field(pattern=_ROLE_PATTERN)
+    userId: str = Field(min_length=1)
+    password: str = Field(min_length=1)
 
 
 class TimingDraftIn(BaseModel):

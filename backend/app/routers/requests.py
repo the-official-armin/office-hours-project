@@ -6,6 +6,9 @@
 - POST /requests/{id}/answer: the teacher accepts or declines.
 - DELETE /requests/{id}: the student withdraws a pending request.
 """
+from datetime import date
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
@@ -26,14 +29,23 @@ class AnswerIn(BaseModel):
 
 @router.get("/requests")
 def list_requests(view: str = Query(pattern="^(teacher|student)$"),
+                  from_date: Optional[date] = Query(default=None, alias="from"),
+                  to_date: Optional[date] = Query(default=None, alias="to"),
                   db: Session = Depends(get_db),
                   teacher: Teacher = Depends(current_teacher),
                   student: Student = Depends(current_student)):
+    if from_date is not None and to_date is not None and from_date > to_date:
+        raise RuleError("invalid", "The from date must be on or before the to date.")
+    date_filter = []
+    if from_date is not None:
+        date_filter.append(BookingRequest.date >= from_date)
+    if to_date is not None:
+        date_filter.append(BookingRequest.date <= to_date)
     if view == "teacher":
         rows = (
             db.query(BookingRequest)
             .options(joinedload(BookingRequest.student))
-            .filter(BookingRequest.teacher_id == teacher.id)
+            .filter(BookingRequest.teacher_id == teacher.id, *date_filter)
             .all()
         )
         rows.sort(key=lambda r: (r.date.isoformat(), r.time))
@@ -41,7 +53,7 @@ def list_requests(view: str = Query(pattern="^(teacher|student)$"),
         rows = (
             db.query(BookingRequest)
             .options(joinedload(BookingRequest.student))
-            .filter(BookingRequest.student_id == student.id)
+            .filter(BookingRequest.student_id == student.id, *date_filter)
             .order_by(BookingRequest.id)
             .all()
         )

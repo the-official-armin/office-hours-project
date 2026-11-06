@@ -12,6 +12,8 @@ class RuleError(Exception):
 # (Malformed request bodies that never reach the rules stay FastAPI's native 422.)
 _STATUS_BY_CODE = {
     "not_found": 404,
+    "invalid_credentials": 401,
+    "unauthorized": 401,
 }
 
 

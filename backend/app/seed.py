@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from . import rules
 from .database import Base, SessionLocal, engine
 from .models import Booking, BookingRequest, DayOff, Notification, Student, Teacher, Timing
+from .security import hash_password
 
 ME_TEACHER = "rivera"
 ME_STUDENT = "maya"
@@ -58,6 +59,7 @@ STUDENTS = {
     "aiden": ("Aiden P.", "Grade 10"),
     "sofia": ("Sofia L.", "Grade 10"),
     "marcus": ("Marcus T.", "Grade 10"),
+    "alex": ("Alex R.", "Grade 10"),
 }
 
 
@@ -73,6 +75,7 @@ def seed(db: Session, now: datetime = None) -> None:
     # ---------------------------------------------------------------- people
     for sid, (name, grade) in STUDENTS.items():
         db.add(Student(id=sid, name=name, grade=grade, email="",
+                       password_hash=hash_password("demo-password"),
                        remind=True, booked=True, answer=True, out=True, lead="1 hour"))
 
     def timing(key: str, name: str, start: str, end: str, days) -> Timing:
@@ -82,6 +85,7 @@ def seed(db: Session, now: datetime = None) -> None:
     def teacher(tid: str, name: str, subject: str, group: str, timings) -> Teacher:
         t = Teacher(id=tid, name=name, subject=subject, subject_group=group,
                     capacity=rules.DEFAULT_CAPACITY, email="",
+                    password_hash=hash_password("demo-password"),
                     remind=True, booking=True, cancel=True, request=True,
                     morning=False, lead="1 hour")
         t.timings = timings
@@ -148,7 +152,9 @@ def seed(db: Session, now: datetime = None) -> None:
     add("okafor", ok[0], "lunch", "daniel", "Lab report questions.")
     add("okafor", ok[0], "lunch", "hana", "Review moles and molar mass.")
     add("okafor", ok[1], "lunch", "leo", "Catch up on the titration lab.")
-    add("okafor", ok[1], "lunch", ME, "Questions about balancing equations.")
+    # Kept off next Tuesday: on Tue–Thu the second Tue/Fri IS next Tuesday, and it
+    # would clash with Maya's seeded Rivera lunch (same time) and break re-booking.
+    add("okafor", ok[2], "lunch", ME, "Questions about balancing equations.")
     add("okafor", ok[2], "lunch", "noor", "Study for the unit test.")
     br = fwd(t0, [2, 4], 6)
     for sid in ["jonas", "zoe", "ines", "tariq"]:
