@@ -1,8 +1,9 @@
 // Shared: changes need a PR note and a teammate review.
 // Purpose: fetch wrapper. The frontend only talks to the backend through src/api/.
 // It adds the signed-in person's token ("Authorization: Bearer ..."). A 401 means the session ended: it tells the auth layer
-// (which forgets the token and sends the person to that role's sign-in) and then throws like any other error.
-import { handleUnauthorized } from '../auth/events'
+// (which forgets the token and sends the person to that role's sign-in) and then throws like any other error. A token that is
+// about to run out is swapped for a fresh one first (POST /auth/refresh), so people aren't signed out while they use the app.
+import { handleUnauthorized, refreshIfNeeded } from '../auth/events'
 import { MESSAGES } from '../auth/messages'
 import { getToken } from '../auth/tokenStore'
 import { RuleError } from './errors'
@@ -14,6 +15,7 @@ export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost
 export const USE_MOCKS: boolean = import.meta.env.VITE_USE_MOCKS !== 'false'
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  await refreshIfNeeded()
   const token = getToken()
   let res: Response
   try {

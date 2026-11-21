@@ -26,6 +26,13 @@ from sqlalchemy.orm import relationship
 from .database import Base
 
 
+# Account status. People are invited by a developer (python -m app.invite), activate from the email by choosing a
+# password, and can be deactivated when they leave (bookings stay on record, sign-in stops).
+STATUS_INVITED = "invited"
+STATUS_ACTIVE = "active"
+STATUS_DEACTIVATED = "deactivated"
+
+
 class Teacher(Base):
     __tablename__ = "teachers"
 
@@ -36,8 +43,12 @@ class Teacher(Base):
     capacity = Column(Integer, nullable=False, default=4)  # "max" — students per office hour
 
     # Email/notification preferences (TeacherPrefs in the frontend types).
-    email = Column(String, nullable=False, default="")
-    password_hash = Column(String, nullable=False, default="")
+    # The school email is also the sign-in: stored lowercase, unique here and (checked in app/accounts.py) across students.
+    email = Column(String, nullable=False, unique=True, index=True)
+    password_hash = Column(String, nullable=False, default="")  # "" until the person activates their account
+    status = Column(String(20), nullable=False, default=STATUS_ACTIVE, server_default=STATUS_ACTIVE)
+    # In every sign-in token; bumping it (log out, new password, deactivate) ends all of the person's sessions at once.
+    session_version = Column(Integer, nullable=False, default=0, server_default="0")
     remind = Column(Boolean, nullable=False, default=True)
     booking = Column(Boolean, nullable=False, default=True)
     cancel = Column(Boolean, nullable=False, default=True)
@@ -90,8 +101,10 @@ class Student(Base):
     id = Column(String, primary_key=True)  # e.g. "maya"
     name = Column(String, nullable=False)
     grade = Column(String, nullable=False, default="")
-    email = Column(String, nullable=False, default="")
-    password_hash = Column(String, nullable=False, default="")
+    email = Column(String, nullable=False, unique=True, index=True)  # sign-in, lowercase (see Teacher.email)
+    password_hash = Column(String, nullable=False, default="")  # "" until the person activates their account
+    status = Column(String(20), nullable=False, default=STATUS_ACTIVE, server_default=STATUS_ACTIVE)
+    session_version = Column(Integer, nullable=False, default=0, server_default="0")  # see Teacher.session_version
 
     # StudentPrefs in the frontend types.
     remind = Column(Boolean, nullable=False, default=True)
@@ -151,3 +164,37 @@ class Notification(Base):
     at = Column(BigInteger, nullable=False)  # epoch milliseconds, matches Note.at
     read = Column(Boolean, nullable=False, default=False)
     key = Column(String, nullable=True)  # dedupe key for generated reminders
+
+
+class AccountLink(Base):
+    """A one-time link sent by email: activate a new account, or reset a forgotten password.
+
+    Only a SHA-256 hash of the token is stored, so a copy of the database can't be used to sign in.
+    """
+
+    __tablename__ = "account_links"
+    __table_args__ = (Index("ix_account_links_person", "role", "user_id"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    purpose = Column(String(20), nullable=False)  # activate | reset
+    role = Column(String(10), nullable=False)  # teacher | student
+    user_id = Column(String, nullable=False)
+    expires_at = Column(DateTime, nullable=False)  # UTC
+    used_at = Column(DateTime, nullable=True)  # UTC; set when used or replaced by a newer link
+    created_at = Column(DateTime, nullable=False)  # UTC
+
+
+class AuthAttempt(Base):
+    """One sign-in, password-link or forgot-password attempt, for rate limits (app/ratelimit.py).
+
+    Kept in the database, not in memory, because on Vercel every request may run in a different process.
+    Rows older than a day are deleted by the reminder job.
+    """
+
+    __tablename__ = "auth_attempts"
+    __table_args__ = (Index("ix_auth_attempts_bucket_at", "bucket", "at"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bucket = Column(String(200), nullable=False)  # what is counted, e.g. "login-email:maya@waprep.org", "login-ip:1.2.3.4"
+    at = Column(DateTime, nullable=False)  # UTC

@@ -6,10 +6,13 @@ export const PASSWORD = 'demo-password'
 /** The example account each role signs in as unless a spec asks for another one. */
 export const DEFAULT_ID = { student: 'maya', teacher: 'rivera' } as const
 
+/** The sign-in email of an example account: maya -> maya@example.com (as in the backend's demo seed). */
+export const emailOf = (id: string): string => (id.includes('@') ? id : `${id}@example.com`)
+
 /** Opens that role's sign-in page, fills the form and waits until the app has loaded. */
 export async function signIn(page: Page, role: 'teacher' | 'student', userId: string = DEFAULT_ID[role], password: string = PASSWORD) {
   await page.goto(`/${role}/login`)
-  await page.getByLabel('User ID').fill(userId)
+  await page.getByLabel('School email').fill(emailOf(userId))
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
   // Signed in once the URL is on this side and no longer a sign-in page (/student/login also starts with /student).

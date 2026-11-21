@@ -15,6 +15,9 @@ _STATUS_BY_CODE = {
     "invalid_credentials": 401,
     "unauthorized": 401,
     "forbidden": 403,
+    "link_invalid": 410,
+    "weak_password": 422,
+    "too_many": 429,
 }
 
 

@@ -111,18 +111,27 @@ interface CalendarData { bookings: Booking[]; requests: BookingRequest[] }
 
 ## 4. Authentication (`src/auth/`)
 
-Matches `backend/README.md` and `backend/app/routers/auth.py` (backend PR #15). People sign in with a **role**, a **user ID**
-(the same id the rest of the API uses: `maya`, `rivera`) and a **password**.
+Matches `backend/README.md` and `backend/app/routers/auth.py`. **Accounts are invite-only**: a developer adds people
+(`python -m app.invite`), each gets an email with a one-time link, chooses a password, and from then on signs in with their
+**school email** and **password**. The account decides the role. There is no sign-up.
 
 | Method | Path | Request | Response | Errors |
 | --- | --- | --- | --- | --- |
-| POST | `/auth/login` | `{ "role": "student" \| "teacher", "userId": string, "password": string }` | `200` `{ "accessToken": string, "tokenType": "bearer", "expiresIn": number (seconds), "user": { "id", "role", "name" } }` | `401 invalid_credentials` (wrong password, unknown ID, or the ID is from the other role: one answer for all three); `422` for a malformed body |
+| POST | `/auth/login` | `{ "email": string, "password": string }` (email in any capitalisation) | `200` `{ "accessToken": string, "tokenType": "bearer", "expiresIn": number (seconds), "user": { "id", "role", "name" } }` | `401 invalid_credentials` (unknown email, wrong password, not activated yet, or deactivated: one answer for all); `422` for a malformed body |
+| GET | `/auth/link/{token}` | the token from an email link | `200` `{ "purpose": "activate" \| "reset", "name", "email", "role" }` | `410 link_invalid` (unknown, used, expired, replaced by a newer link, or the account was deactivated) |
+| POST | `/auth/set-password` | `{ "token": string, "password": string }` | `200`, same as `/auth/login`: the person is signed in, and an invited account becomes active | `410 link_invalid`; `422 weak_password` (under 10 or over 128 characters, or the email itself) |
+| POST | `/auth/refresh` | header `Authorization: Bearer <accessToken>` | `200`, same as `/auth/login`, for the same sign-in: a fresh token while the session is in use | `401 unauthorized` (bad or ended token, or more than 7 days since signing in) |
+| POST | `/auth/logout` | header `Authorization: Bearer <accessToken>` | `204`. Ends every session of this person on every device: all their tokens stop working at once | `401 unauthorized` |
+| POST | `/auth/forgot-password` | `{ "email": string }` | `204` always, whether or not the email has an account. An active account gets a reset link (1 hour); one that never activated gets a new invite (7 days) | `422` for a malformed body |
 | GET | `/auth/me` | header `Authorization: Bearer <accessToken>` | `200` `{ "id", "role", "name" }` | `401 unauthorized` |
 
 **What the frontend does with it**
 
-- `/login` asks "I'm a student / I'm a teacher". `/student/login` and `/teacher/login` share one form (User ID, Password, "Keep me signed in").
-  The page picks the `role` it sends. There is no sign-up page: the school creates accounts.
+- `/login` asks "I'm a student / I'm a teacher". `/student/login` and `/teacher/login` share one form (School email, Password, "Keep me
+  signed in"); only the words differ, and a teacher who signs in on the student page lands on the teacher side.
+- `/activate?token=` (invite) and `/reset-password?token=` (forgot password) greet the person, ask for a new password twice and sign them
+  in; a new teacher lands on Office hours. The token is removed from the address bar on load. `/forgot-password` asks for the email.
+- The email in Settings is read-only: it is the sign-in, set by the school. `PUT /teacher/settings` and `/student/settings` ignore `email`.
 - After `POST /auth/login` the token is kept in `sessionStorage` (gone when the tab closes), or in `localStorage` when "Keep me signed in"
   is ticked. On start the app calls `GET /auth/me` with the saved token and shows a spinner meanwhile, so the login page never flashes.
   A token past its `expiresIn` is never sent.
@@ -134,12 +143,21 @@ Matches `backend/README.md` and `backend/app/routers/auth.py` (backend PR #15). 
 - **Log out is client-side** (the backend has no logout endpoint): the token is forgotten and the person sees "Signed out".
 - A `403` is not treated as "session ended": the token is fine, the role is wrong.
 
+**Rate limits** (`backend/app/ratelimit.py`, kept in the database): `429 too_many` ("Too many tries. Wait a few minutes and
+try again.") after 10 failed sign-ins for one email or 30 from one computer in 15 minutes, 3 forgot-password emails per address
+or 20 requests per computer in an hour, and 20 unusable links per computer in 15 minutes.
+
+**Sessions**: a token lasts 60 minutes; in its last 10 minutes the app swaps it for a fresh one before the next request
+(`POST /auth/refresh`), for up to 7 days after signing in. Log out calls `POST /auth/logout`. Choosing a new password or being
+deactivated also ends every session. Each token carries the person's session number (`ver`), which those actions bump.
+
 **What every other endpoint does** (`backend/app/deps.py`):
 `401 unauthorized` when the bearer token is missing, invalid or expired; `403 forbidden` when the token's role is not allowed (a
 student on `/teacher/...`, or a `?view=` for the other role); and the identity (`teacher.id`, `student.id`) always comes from the token's `sub`, never from the request.
 
-**Mock mode** (`VITE_USE_MOCKS=true`) behaves the same way: accounts `maya`, `daniel` (students) and `rivera`, `okafor` (teachers), password
-`demo-password` (the backend's demo seed password), a 400 ms delay, `401 invalid_credentials` for anything wrong, and tokens that last 60
+**Mock mode** (`VITE_USE_MOCKS=true`) behaves the same way: accounts `maya@example.com`, `daniel@example.com` (students) and
+`rivera@example.com`, `okafor@example.com` (teachers), password `demo-password` (the backend's demo seed). Mock mode sends no email, so
+every link answers "expired" and forgot password just says it was sent. Otherwise a 400 ms delay, `401 invalid_credentials` for anything wrong, and tokens that last 60
 minutes. The sign-in page shows a "Demo accounts" box (click to fill) only in mock mode. Each account has its own notifications and
 settings, so two students can be signed in at once in two tabs.
 
@@ -405,13 +423,13 @@ What the frontend would like added to the auth in `backend/app`. None of it bloc
 | Wanted from the backend | Why | What the frontend does until then |
 | --- | --- | --- |
 | ~~**Endpoints check the token**~~ **Done** (`app/deps.py`: `401 unauthorized` without or with a bad token, `403 forbidden` for the wrong role or `view`; `ME_TEACHER_ID` / `ME_STUDENT_ID` removed) | Every endpoint answers for the person who signed in | Sends the token on every request and ends the session on a `401` |
-| A **refresh token** (rotated, stored hashed, 7 to 30 days, revoked on logout) in an `httpOnly` cookie, plus `POST /auth/refresh` -> `{ accessToken, expiresIn }` | The access token lasts 60 minutes (`JWT_EXPIRE_MINUTES`). Without a refresh, people are signed out hourly, and the frontend must keep the access token in `sessionStorage` / `localStorage`, where a script injected into the page could read it | The token is kept in `sessionStorage` (or `localStorage` with "Keep me signed in"). After a `401` the person signs in again |
-| `POST /auth/logout` -> `204` (revokes the refresh token) | A real log out | Log out forgets the token in the browser only; the token stays valid until it expires |
-| **Rate limit** on `POST /auth/login`, per account and per IP, answering `429` | Stops password guessing | It shows "Too many tries. Wait a few minutes and try again." for a `429`, but nothing sends one yet |
+| ~~A **refresh token**~~ **Done differently**: `POST /auth/refresh` swaps a still-valid token for a fresh one (up to 7 days after signing in), and log out / new password end every session at once. The token is still kept in `sessionStorage` / `localStorage`; an `httpOnly` cookie would keep it away from scripts on the page, and is the next step if needed | The access token lasts 60 minutes (`JWT_EXPIRE_MINUTES`). Without a refresh, people are signed out hourly, and the frontend must keep the access token in `sessionStorage` / `localStorage`, where a script injected into the page could read it | The token is kept in `sessionStorage` (or `localStorage` with "Keep me signed in"). After a `401` the person signs in again |
+| ~~`POST /auth/logout`~~ **Done**: `204`, ends every session of the person | A real log out | Log out forgets the token in the browser only; the token stays valid until it expires |
+| ~~**Rate limit**~~ **Done**: sign-in, links and forgot password, per email and per computer, answering `429` | Stops password guessing | It shows "Too many tries. Wait a few minutes and try again." for a `429`, but nothing sends one yet |
 | A distinct answer for the right ID on the wrong side, for example `403 WRONG_ROLE` ("This is a student account. Use student sign in.") | Friendlier than a blind "incorrect" | It shows the same "User ID or password is incorrect." for every login failure. Never saying which part was wrong is also the safe default |
 | ~~**CORS limited to the frontend's origin**~~ **Done**: `CORS_ORIGINS` (comma-separated); empty allows any `localhost` port for development. Credentials are off (the token travels in a header). A refresh cookie would need `allow_credentials=True` | `*` lets any site call the API | Nothing to do |
 | **`JWT_SECRET` set to a long random value** in every deployed environment. The backend now logs a warning when it runs on Postgres with the development default | A known secret lets anyone mint tokens for any user | Not applicable (backend setting) |
-| Real passwords, not `demo-password`; **no public sign-up** (accounts created by the school) | The demo seed gives every account the same password | There is no sign-up page |
+| ~~Real passwords, not `demo-password`; **no public sign-up**~~ **Done**: invite-only accounts, each person chooses their own password (`app/accounts.py`). The demo seed stays for development (`AUTO_SEED`) | The demo seed gives every account the same password | There is no sign-up page |
 | `GET /auth/me` could also return the fields the sidebar shows (`subject` for a teacher, `grade` for a student) | The profile is read again from `/teacher/settings` and `/student/settings` after sign-in | It shows what the settings endpoints return |
 
 ### User fields: frontend vs the backend's tables

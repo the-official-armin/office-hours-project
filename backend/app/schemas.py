@@ -12,9 +12,17 @@ _ROLE_PATTERN = r"^(student|teacher)$"
 
 
 class LoginIn(BaseModel):
-    role: str = Field(pattern=_ROLE_PATTERN)
-    userId: str = Field(min_length=1)
-    password: str = Field(min_length=1)
+    email: str = Field(min_length=1, max_length=320)
+    password: str = Field(min_length=1, max_length=1024)
+
+
+class SetPasswordIn(BaseModel):
+    token: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=1, max_length=1024)
+
+
+class ForgotPasswordIn(BaseModel):
+    email: str = Field(min_length=1, max_length=320)
 
 
 class TimingDraftIn(BaseModel):

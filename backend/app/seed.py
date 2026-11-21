@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from . import rules
 from .database import Base, SessionLocal, engine
-from .models import Booking, BookingRequest, DayOff, Notification, Student, Teacher, Timing
+from .models import AccountLink, Booking, BookingRequest, DayOff, Notification, Student, Teacher, Timing
 from .security import hash_password
 
 ME_TEACHER = "rivera"
@@ -63,18 +63,23 @@ STUDENTS = {
 }
 
 
+def demo_email(person_id: str) -> str:
+    """Demo accounts sign in with <id>@example.com (a domain reserved for examples, so no email can reach anyone)."""
+    return "%s@example.com" % person_id
+
+
 def seed(db: Session, now: datetime = None) -> None:
     now = now or datetime.now()
     t0 = now.date()
     now_ms = int(now.timestamp() * 1000)
 
     # Wipe in dependency order (seed is a full reset).
-    for model in (Notification, BookingRequest, Booking, DayOff, Timing, Student, Teacher):
+    for model in (AccountLink, Notification, BookingRequest, Booking, DayOff, Timing, Student, Teacher):
         db.query(model).delete()
 
     # ---------------------------------------------------------------- people
     for sid, (name, grade) in STUDENTS.items():
-        db.add(Student(id=sid, name=name, grade=grade, email="",
+        db.add(Student(id=sid, name=name, grade=grade, email=demo_email(sid),
                        password_hash=hash_password("demo-password"),
                        remind=True, booked=True, answer=True, out=True, lead="1 hour"))
 
@@ -84,7 +89,7 @@ def seed(db: Session, now: datetime = None) -> None:
 
     def teacher(tid: str, name: str, subject: str, group: str, timings) -> Teacher:
         t = Teacher(id=tid, name=name, subject=subject, subject_group=group,
-                    capacity=rules.DEFAULT_CAPACITY, email="",
+                    capacity=rules.DEFAULT_CAPACITY, email=demo_email(tid),
                     password_hash=hash_password("demo-password"),
                     remind=True, booking=True, cancel=True, request=True,
                     morning=False, lead="1 hour")

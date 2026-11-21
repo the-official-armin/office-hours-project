@@ -1,11 +1,11 @@
-// Purpose: the one sign-in form for both roles. Only the words differ. Errors: inline under the field (aria-invalid, aria-describedby,
+// Purpose: the one sign-in form for both roles (school email + password). Only the words differ; the account decides the role. Errors: inline under the field (aria-invalid, aria-describedby,
 // focus on the first bad field) for empty fields; a role="alert" banner for what the server says. After a failed attempt the
-// user ID stays and the password is cleared. No sign-up: accounts are made by the school.
+// email stays and the password is cleared. No sign-up: the school invites people, and they choose a password from the email.
 import { useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { safeNext } from '../../auth/access'
 import { useAuth } from '../../auth/AuthProvider'
-import { FORGOT_NOTE, messageFor, NO_ACCOUNT, SESSION_ENDED } from '../../auth/messages'
+import { messageFor, NO_ACCOUNT, SESSION_ENDED } from '../../auth/messages'
 import { hasErrors, validateLogin, type LoginFieldErrors } from '../../auth/validate'
 import { USE_MOCKS } from '../../api/client'
 import type { Role } from '../../types'
@@ -40,34 +40,33 @@ export default function LoginForm({ role }: { role: Role }) {
   const [params] = useSearchParams()
   const reason = params.get('reason')
 
-  const [userId, setUserId] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
   const [show, setShow] = useState(false)
   const [pending, setPending] = useState(false)
   const [errors, setErrors] = useState<LoginFieldErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
-  const [forgot, setForgot] = useState(false)
 
-  const userRef = useRef<HTMLInputElement>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
   const passRef = useRef<HTMLInputElement>(null)
   const uid = useId()
-  const userErrId = `${uid}-user-err`
+  const emailErrId = `${uid}-email-err`
   const passErrId = `${uid}-pass-err`
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (pending) return
-    const found = validateLogin(userId, password)
+    const found = validateLogin(email, password)
     setErrors(found)
     if (hasErrors(found)) {
-      ;(found.userId ? userRef : passRef).current?.focus()
+      ;(found.email ? emailRef : passRef).current?.focus()
       return
     }
     setServerError(null)
     setPending(true)
     try {
-      const user = await login(role, userId, password, remember)
+      const user = await login(email, password, remember)
       navigate(safeNext(params.get('next'), user.role), { replace: true })
     } catch (err) {
       setServerError(messageFor(err))
@@ -98,27 +97,27 @@ export default function LoginForm({ role }: { role: Role }) {
 
       <form noValidate onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${uid}-user`} className="text-[13px] font-bold text-ink2">
-            User ID
+          <label htmlFor={`${uid}-email`} className="text-[13px] font-bold text-ink2">
+            School email
           </label>
           <input
-            ref={userRef}
-            id={`${uid}-user`}
+            ref={emailRef}
+            id={`${uid}-email`}
             name="username"
-            type="text"
+            type="email"
             autoComplete="username"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            aria-invalid={errors.userId ? true : undefined}
-            aria-describedby={errors.userId ? userErrId : undefined}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? emailErrId : undefined}
             className={field}
           />
-          {errors.userId && (
-            <p id={userErrId} className="text-sm font-semibold text-danger">
-              {errors.userId}
+          {errors.email && (
+            <p id={emailErrId} className="text-sm font-semibold text-danger">
+              {errors.email}
             </p>
           )}
         </div>
@@ -166,28 +165,16 @@ export default function LoginForm({ role }: { role: Role }) {
           Sign in
         </Button>
 
-        <div>
-          <button
-            type="button"
-            aria-expanded={forgot}
-            onClick={() => setForgot((f) => !f)}
-            className="inline-flex min-h-11 items-center border-0 bg-transparent p-0 text-sm font-bold text-link"
-          >
-            Forgot password?
-          </button>
-          {forgot && (
-            <p role="status" className="rounded-xl bg-soft px-4 py-3 text-sm text-ink2">
-              {FORGOT_NOTE}
-            </p>
-          )}
-        </div>
+        <Link to="/forgot-password" className="inline-flex min-h-11 items-center text-sm font-bold text-link">
+          Forgot password?
+        </Link>
       </form>
 
       {USE_MOCKS && (
         <DemoAccounts
           role={role}
           onPick={(id, pw) => {
-            setUserId(id)
+            setEmail(id)
             setPassword(pw)
             setErrors({})
             setServerError(null)

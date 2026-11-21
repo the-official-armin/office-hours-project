@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 os.environ["DATABASE_URL"] = "sqlite://"  # in-memory, shared via StaticPool
 os.environ["AUTO_SEED"] = "false"
+os.environ["POSTMARK_TOKEN"] = ""  # tests never send real email, even with a token in backend/.env
 
 import pytest
 from fastapi.testclient import TestClient

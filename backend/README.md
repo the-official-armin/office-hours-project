@@ -45,7 +45,8 @@ Sign in with any demo account, password `demo-password`: students `maya`, `danie
 
 ## Settings
 
-All settings are environment variables; `.env.example` lists them with comments.
+All settings are environment variables; `.env.example` lists them with comments. `backend/.env` is read automatically
+(environment variables win). Check email with `venv/bin/python -m app.mailer you@waprep.org`.
 
 | Variable | Default | Deployed |
 | --- | --- | --- |
@@ -55,6 +56,13 @@ All settings are environment variables; `.env.example` lists them with comments.
 | `SCHOOL_TZ` | the server clock | The school's zone, e.g. `America/Los_Angeles` (hosts run in UTC) |
 | `CORS_ORIGINS` | any `localhost` port | The frontend's URL, e.g. `https://office-hours.vercel.app` |
 | `AUTO_SEED` | `true` | `false` |
+| `POSTMARK_TOKEN` | empty: emails are written to the log | The Postmark Server API token |
+| `EMAIL_FROM` | empty | A confirmed Postmark sender, e.g. `noreply@waprep.org` |
+| `APP_URL` | `http://localhost:5173` | The frontend's URL (links in emails) |
+| `SESSION_MAX_DAYS` | `7` | `7`: how long `POST /auth/refresh` keeps a sign-in going |
+| `CLIENT_IP_HEADER` | empty (the direct connection) | `x-real-ip` on Vercel, so rate limits see each visitor's address |
+| `CRON_SECRET` | empty: `/jobs/reminders` is off | A long random value; the timer sends it as `Authorization: Bearer …` |
+| `REMINDER_INTERVAL_MINUTES` | `0` (off) | `0` on Vercel (a timer calls the endpoint); `5` locally |
 
 ## API reference
 
@@ -73,14 +81,34 @@ The `view` parameter must match the signed-in role: `view=teacher` for teachers,
 
 ### Authentication
 
-Users are stored in the `teachers` and `students` tables. Passwords are stored as
-scrypt hashes, never as plaintext. The demo seed creates every demo account with the
-password `demo-password`; change these credentials before using a deployed database.
+Users are stored in the `teachers` and `students` tables. **Accounts are invite-only**: a developer
+adds people with `python -m app.invite` (below), each gets an email with a one-time link (7 days), chooses
+a password and is signed in. Afterwards they sign in with their school email, which is unique across
+teachers and students. Passwords are scrypt hashes; links are stored only as SHA-256 hashes
+(`account_links`). The demo seed creates `<id>@example.com` accounts with the password `demo-password`
+for development (`AUTO_SEED=false` when deployed).
 
 | Method & path | What it does |
 | --- | --- |
-| `POST /auth/login` | Accepts `{ "role": "teacher" \| "student", "userId": "<id>", "password": "<password>" }` and returns `{ accessToken, tokenType, expiresIn, user }`. |
+| `POST /auth/login` | Accepts `{ "email", "password" }` and returns `{ accessToken, tokenType, expiresIn, user }`. Only active accounts. |
+| `GET /auth/link/{token}` | What an email link is for: `{ purpose, name, email, role }`, or `410 link_invalid`. |
+| `POST /auth/set-password` | `{ "token", "password" }`: chooses a password from an invite or reset link, activates, signs in. |
+| `POST /auth/refresh` | A fresh token for the same sign-in, up to `SESSION_MAX_DAYS` after signing in. |
+| `POST /auth/logout` | Ends every session of the person (bumps their `session_version`). |
+| `POST /auth/forgot-password` | `{ "email" }`: always `204`; emails a reset link (1 hour) or a new invite. |
 | `GET /auth/me` | Validates a bearer token and returns the authenticated `{ id, role, name }`. |
+
+**Adding people** (`app/invite.py`, uses `DATABASE_URL` and `POSTMARK_TOKEN` from `backend/.env`):
+
+```
+venv/bin/python -m app.invite people.csv                # name,email,role[,grade,subject,group]
+venv/bin/python -m app.invite --resend maya@waprep.org   # new activation link
+venv/bin/python -m app.invite --deactivate maya@waprep.org
+venv/bin/python -m app.invite --reactivate maya@waprep.org
+venv/bin/python -m app.invite --list
+```
+
+Deactivating stops sign-in and open sessions at once; bookings stay on record.
 
 Set `JWT_SECRET` to a long random value in deployment. Tokens expire after
 `JWT_EXPIRE_MINUTES` (60 by default). Run `alembic upgrade head` before starting
@@ -125,6 +153,18 @@ against an existing database so the credential columns are present.
 | `GET /notifications?view=teacher` | The signed-in teacher's inbox, newest first (`Note`: id, text, at, read, key?). |
 | `GET /notifications?view=student` | The signed-in student's inbox, newest first. |
 | `POST /notifications/read-all?view=teacher\|student` | Mark that inbox as read (204). The bell icon calls this. |
+
+### Reminder emails
+
+`app/reminders.py` sends what is due: students before each booked office hour (their chosen 30 minutes / 1 hour / 1 day),
+teachers before each office hour with bookings, and the teacher's morning summary from 7:00. Every reminder is also an
+in-app notification with a dedupe key, so it is never sent twice. Runs:
+
+| How | When |
+| --- | --- |
+| `GET` or `POST /jobs/reminders` with `Authorization: Bearer <CRON_SECRET>` | Deployed: a timer every 5 minutes. Answers `{ "sent": { "student": n, "teacher": n, "morning": n } }`; `401` with a wrong secret, `404` when `CRON_SECRET` is empty |
+| `REMINDER_INTERVAL_MINUTES=5` | Locally: the backend runs it by itself |
+| `venv/bin/python -m app.reminders` | By hand |
 
 ### Misc
 

@@ -1,4 +1,4 @@
-// Owner: Subgroup B (Teacher desktop UI). Purpose: profile, which emails the teacher gets (simulated in the MVP),
+// Owner: Subgroup B (Teacher desktop UI). Purpose: profile, which emails the teacher gets (sent by the backend through Postmark),
 // when the reminder is sent, a preview of the reminder, and the account actions.
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -12,6 +12,8 @@ import { useToast } from '../../components/common/Toast'
 import { teacherWorld, useTeacherData } from '../../hooks/TeacherData'
 import { useAction } from '../../hooks/useAction'
 import { useAuth } from '../../hooks/useAuth'
+import { authApi } from '../../auth/authApi'
+import { messageFor, passwordLinkSent } from '../../auth/messages'
 import { formatTime, plural, toISODate } from '../../lib/dates'
 import { listSlots } from '../../lib/rules'
 import { endSentence } from '../../lib/text'
@@ -38,7 +40,6 @@ export default function TeacherSettings() {
 
   const [name, setName] = useState(s.name)
   const [subject, setSubject] = useState(s.subject)
-  const [email, setEmail] = useState(s.email)
 
   const world = teacherWorld(data)
   const next = listSlots(world, data.teacher, toISODate(now), 60, now).find((o) => o.row.taken > 0)
@@ -62,9 +63,12 @@ export default function TeacherSettings() {
                 <TextInput type="text" value={subject} onChange={(e) => setSubject(e.target.value)} />
               </Field>
             </div>
-            <Field label="Email for reminders">
-              <TextInput type="email" placeholder="your school email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Field label="School email (sign-in and reminders)">
+              <TextInput type="email" value={s.email} readOnly aria-describedby="email-note" className="text-muted" />
             </Field>
+            <p id="email-note" className="-mt-2 text-sm text-muted">
+              Set by the school. Ask the school office to change it.
+            </p>
           </Card>
 
           <EmailReminders
@@ -114,7 +118,16 @@ export default function TeacherSettings() {
             <CardTitle id="acct-h">Account</CardTitle>
             <p className="text-muted">Signed in as {endSentence(s.name)}</p>
             <div className="flex flex-wrap gap-3">
-              <Button onClick={() => toast('Changing a password isn’t part of this preview.')}>Change password</Button>
+              <Button
+                onClick={() =>
+                  authApi.forgotPassword(s.email).then(
+                    () => toast(passwordLinkSent(s.email)),
+                    (err: unknown) => toast(messageFor(err)),
+                  )
+                }
+              >
+                Change password
+              </Button>
               <Button
                 variant="danger"
                 onClick={logout}
@@ -132,7 +145,7 @@ export default function TeacherSettings() {
           variant="primary"
           className="!px-[22px]"
           loading={isPending('save')}
-          onClick={() => void run('save', () => saveSettings({ ...s, name, subject, email }), 'Settings saved.')}
+          onClick={() => void run('save', () => saveSettings({ ...s, name, subject }), 'Settings saved.')}
         >
           Save settings
         </Button>

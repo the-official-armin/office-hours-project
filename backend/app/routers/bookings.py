@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from .. import rules, views
+from .. import outbox, rules, views
 from ..deps import CurrentUser, check_view, current_student, current_user, get_db, now_local, push_note
 from ..errors import RuleError
 from ..models import Booking, Student, Teacher, Timing
@@ -102,6 +102,21 @@ def book_seat(body: BookSeatIn, db: Session = Depends(get_db),
             student.name, timing.name, rules.format_date_short(booking.date)),
         teacher_id=teacher.id,
         enabled=teacher.booking,
+        subject="New booking: %s, %s" % (student.name, rules.format_date_short(booking.date)),
+        link="/teacher/calendar",
+        tag="booking",
+    )
+    when = "%s (%s), %s" % (timing.name, rules.format_range(rules.hhmm(timing.start_time), rules.hhmm(timing.end_time)),
+                            rules.format_date_long(booking.date))
+    outbox.email_person(
+        db,
+        "Booked: %s, %s" % (teacher.name, rules.format_date_short(booking.date)),
+        ["You have a spot at %s's office hours: %s." % (teacher.name, when),
+         "Can't make it? Cancel in My bookings so someone else can have the spot."],
+        student_id=student.id,
+        enabled=student.booked,
+        link="/student/bookings",
+        tag="booked",
     )
     db.commit()
     db.refresh(booking)
@@ -136,6 +151,9 @@ def cancel_booking(booking_id: int, db: Session = Depends(get_db),
                 rules.format_date_short(booking.date)),
             teacher_id=teacher.id,
             enabled=teacher.cancel,
+            subject="Cancelled: %s, %s" % (student.name, rules.format_date_short(booking.date)),
+            link="/teacher/calendar",
+            tag="cancel",
         )
     db.commit()
     return Response(status_code=204)

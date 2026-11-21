@@ -32,7 +32,7 @@ def test_healthz(client):
 
 def test_teacher_login_and_me(client):
     res = client.post("/auth/login", json={
-        "role": "teacher", "userId": "rivera", "password": "demo-password",
+        "email": "rivera@example.com", "password": "demo-password",
     })
     assert res.status_code == 200
     body = res.json()
@@ -45,7 +45,7 @@ def test_teacher_login_and_me(client):
 
 def test_second_demo_student_can_log_in(client):
     res = client.post("/auth/login", json={
-        "role": "student", "userId": "alex", "password": "demo-password",
+        "email": "alex@example.com", "password": "demo-password",
     })
     assert res.status_code == 200
     assert res.json()["user"]["name"] == "Alex R."
@@ -53,7 +53,7 @@ def test_second_demo_student_can_log_in(client):
 
 def test_login_rejects_bad_password(client):
     res = client.post("/auth/login", json={
-        "role": "student", "userId": "maya", "password": "wrong",
+        "email": "maya@example.com", "password": "wrong",
     })
     assert res.status_code == 401
     assert res.json()["code"] == "invalid_credentials"
@@ -421,30 +421,28 @@ def test_send_request_rules(student):
 def test_teacher_settings_roundtrip(teacher):
     body = teacher.get("/teacher/settings").json()
     assert body["name"] == "Ms. Rivera"
-    body["email"] = "rivera@school.edu"
+    assert body["email"] == "rivera@example.com"
     body["morning"] = True
     res = teacher.put("/teacher/settings", json=body)
     assert res.status_code == 200
-    assert res.json()["email"] == "rivera@school.edu"
     assert teacher.get("/teacher/settings").json()["morning"] is True
 
 
-def test_settings_validation(teacher, student):
+def test_settings_cannot_change_the_sign_in_email(teacher, student):
+    # The email is the sign-in and comes from the invite; settings ignore it.
+    body = teacher.get("/teacher/settings").json()
+    body["email"] = "someone.else@waprep.org"
+    assert teacher.put("/teacher/settings", json=body).json()["email"] == "rivera@example.com"
+    sbody = student.get("/student/settings").json()
+    sbody["email"] = "nope"
+    assert student.put("/student/settings", json=sbody).json()["email"] == "maya@example.com"
+
+
+def test_settings_validation(teacher):
     bad = teacher.get("/teacher/settings").json()
     bad["name"] = "   "
     res = teacher.put("/teacher/settings", json=bad)
     assert res.status_code == 409
-    assert res.json()["code"] == "invalid"
-
-    bad["name"] = "Ms. Rivera"
-    bad["email"] = "not-an-email"
-    res = teacher.put("/teacher/settings", json=bad)
-    assert res.status_code == 409
-    assert res.json()["code"] == "invalid"
-
-    sbad = student.get("/student/settings").json()
-    sbad["email"] = "nope"
-    res = student.put("/student/settings", json=sbad)
     assert res.json()["code"] == "invalid"
 
 

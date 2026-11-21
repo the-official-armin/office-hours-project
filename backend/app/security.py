@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Dict
+from typing import Dict, Optional
 
 import jwt
 
@@ -34,9 +34,18 @@ def verify_password(password: str, encoded: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
-def create_access_token(user_id: str, role: str) -> str:
-    expires = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRE_MINUTES)
-    return jwt.encode({"sub": user_id, "role": role, "exp": expires}, JWT_SECRET, algorithm="HS256")
+def create_access_token(user_id: str, role: str, version: int = 0, signed_in_at: Optional[int] = None) -> str:
+    """A sign-in token. `ver` is the person's session number (bumped on log out, so old tokens stop working);
+    `auth` is when they signed in (epoch seconds), kept across refreshes so a session can't last forever."""
+    now = datetime.now(timezone.utc)
+    claims = {
+        "sub": user_id,
+        "role": role,
+        "ver": version,
+        "auth": signed_in_at if signed_in_at is not None else int(now.timestamp()),
+        "exp": now + timedelta(minutes=JWT_EXPIRE_MINUTES),
+    }
+    return jwt.encode(claims, JWT_SECRET, algorithm="HS256")
 
 
 def decode_access_token(token: str) -> Dict[str, str]:

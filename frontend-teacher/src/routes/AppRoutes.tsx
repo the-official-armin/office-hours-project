@@ -7,9 +7,10 @@ import AuthSplash from '../components/auth/AuthSplash'
 import { HOME_PATH } from '../components/common/nav'
 import StudentLayout from '../components/student/StudentLayout'
 import TeacherLayout from '../components/teacher/TeacherLayout'
-import AdminDashboard from '../pages/admin/AdminDashboard'
+import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage'
 import LoginPage from '../pages/auth/LoginPage'
 import RoleChooser from '../pages/auth/RoleChooser'
+import SetPasswordPage from '../pages/auth/SetPasswordPage'
 import BookSpot from '../pages/student/BookSpot'
 import FindTeacher from '../pages/student/FindTeacher'
 import MyBookings from '../pages/student/MyBookings'
@@ -37,7 +38,10 @@ export default function AppRoutes() {
       <Route path="/login" element={<RoleChooser />} />
       <Route path="/student/login" element={<LoginPage role="student" />} />
       <Route path="/teacher/login" element={<LoginPage role="teacher" />} />
-      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/activate" element={<SetPasswordPage purpose="activate" />} />
+      <Route path="/reset-password" element={<SetPasswordPage purpose="reset" />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      {/* /admin is hidden until the other team builds it (src/pages/admin/AdminDashboard.tsx is still theirs). */}
 
       <Route element={<RequireRole role="teacher" />}>
         <Route path="/teacher" element={<TeacherLayout />}>

@@ -7,7 +7,7 @@ Every endpoint except /healthz, /teachers and /auth/login needs `Authorization: 
 - check_view: the ?view= of the shared resources must match the signed-in role (403 otherwise).
 """
 import time as time_module
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Union
 from zoneinfo import ZoneInfo
@@ -17,9 +17,10 @@ from jwt import InvalidTokenError
 from sqlalchemy.orm import Session
 
 from .config import SCHOOL_TZ
+from . import outbox
 from .database import SessionLocal
 from .errors import RuleError
-from .models import Notification, Student, Teacher
+from .models import STATUS_ACTIVE, Notification, Student, Teacher
 from .security import decode_access_token
 
 
@@ -35,6 +36,7 @@ def get_db():
 class CurrentUser:
     role: str  # teacher | student
     user: Union[Teacher, Student]
+    claims: dict = field(default_factory=dict)  # the token's claims (POST /auth/refresh keeps its sign-in time)
 
 
 def current_user(authorization: str = Header(default=""), db: Session = Depends(get_db)) -> CurrentUser:
@@ -51,7 +53,13 @@ def current_user(authorization: str = Header(default=""), db: Session = Depends(
     user = db.get(Teacher if role == "teacher" else Student, claims["sub"])
     if user is None:
         raise RuleError("unauthorized", "That account no longer exists.")
-    return CurrentUser(role=role, user=user)
+    if user.status != STATUS_ACTIVE:
+        # Deactivated: their tokens stop working at once, not when they expire.
+        raise RuleError("unauthorized", "This account is not active.")
+    if claims.get("ver", 0) != user.session_version:
+        # Logged out, or a new password was chosen, since this token was made.
+        raise RuleError("unauthorized", "Your session has ended. Please sign in again.")
+    return CurrentUser(role=role, user=user, claims=claims)
 
 
 def current_teacher(me: CurrentUser = Depends(current_user)) -> Teacher:
@@ -81,8 +89,9 @@ def now_local() -> datetime:
 
 def push_note(db: Session, text: str, *, teacher_id: Optional[str] = None,
               student_id: Optional[str] = None, enabled: bool = True,
-              key: Optional[str] = None) -> bool:
-    """Adds a notification for one recipient, newest first. Skips when disabled or the key exists."""
+              key: Optional[str] = None, subject: Optional[str] = None, link: str = "", tag: str = "") -> bool:
+    """Adds a notification for one recipient, newest first. Skips when disabled or the key exists.
+    With a `subject` the same news is also emailed (app/outbox.py), once the change is saved."""
     if not enabled:
         return False
     if key is not None:
@@ -103,4 +112,6 @@ def push_note(db: Session, text: str, *, teacher_id: Optional[str] = None,
     )
     db.add(note)
     db.flush()
+    if subject:
+        outbox.email_person(db, subject, [text], teacher_id=teacher_id, student_id=student_id, link=link, tag=tag)
     return True
