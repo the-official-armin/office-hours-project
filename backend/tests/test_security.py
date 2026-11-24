@@ -89,6 +89,36 @@ def test_old_attempts_are_cleaned_up(client, db):
     assert db.query(AuthAttempt).count() == 0
 
 
+# ------------------------------------------------------------------------------------------------ same work either way
+
+@pytest.mark.parametrize("email", [
+    "nobody@example.com",       # no account
+    "maya@example.com",         # wrong password
+    "invited@waprep.org",       # invited, no password yet
+    "maya.gone@waprep.org",     # deactivated
+])
+def test_every_failed_sign_in_runs_the_password_check(client, db, outbox, monkeypatch, email):
+    """The slow scrypt check runs exactly once for every kind of failure, so timing can't tell them apart."""
+    from app.models import Student
+    db.add(Student(id="invited", name="Invited Person", email="invited@waprep.org", status="invited"))
+    db.add(Student(id="gone", name="Gone Person", email="maya.gone@waprep.org", status="deactivated",
+                   password_hash=maya_hash(db)))
+    db.commit()
+
+    from app.routers import auth as auth_router
+    calls = []
+    real = auth_router.verify_password
+    monkeypatch.setattr(auth_router, "verify_password", lambda pw, h: calls.append(h) or real(pw, h))
+    res = login(client, email=email, password="wrong-password" if email == "maya@example.com" else "demo-password")
+    assert res.status_code == 401 and res.json()["code"] == "invalid_credentials"
+    assert len(calls) == 1 and calls[0].startswith("scrypt$")
+
+
+def maya_hash(db):
+    from app.models import Student
+    return db.get(Student, "maya").password_hash
+
+
 # ------------------------------------------------------------------------------------------------ sessions
 
 def test_log_out_ends_the_session_on_every_device(client):

@@ -11,7 +11,7 @@ from ..deps import CurrentUser, current_user, get_db
 from ..errors import RuleError
 from ..models import STATUS_ACTIVE
 from ..schemas import ForgotPasswordIn, LoginIn, SetPasswordIn
-from ..security import create_access_token, verify_password
+from ..security import DUMMY_PASSWORD_HASH, create_access_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -39,8 +39,11 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     email, ip = accounts.normalize_email(body.email), ratelimit.client_ip(request)
     ratelimit.check(db, "login-email", email)
     found = accounts.find_by_email(db, email)
-    if (found is not None and found[0].status == STATUS_ACTIVE
-            and verify_password(body.password, found[0].password_hash)):
+    # Always run the (deliberately slow) password check, against a stand-in hash when there is no account or no password
+    # yet, so the time it takes is the same whoever asks.
+    stored = found[0].password_hash if found is not None and found[0].password_hash else DUMMY_PASSWORD_HASH
+    password_ok = verify_password(body.password, stored)
+    if found is not None and stored is not DUMMY_PASSWORD_HASH and found[0].status == STATUS_ACTIVE and password_ok:
         user, role = found
         return _session(user, role)
     ratelimit.record(db, "login-email", email)

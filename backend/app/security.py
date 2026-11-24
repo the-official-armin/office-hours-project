@@ -34,6 +34,11 @@ def verify_password(password: str, encoded: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
+# A real scrypt hash of a random password nobody knows. Sign-in checks the password against it when there is no account
+# (or one without a password yet), so every sign-in costs the same and the response time doesn't reveal who has an account.
+DUMMY_PASSWORD_HASH = hash_password(base64.urlsafe_b64encode(os.urandom(24)).decode())
+
+
 def create_access_token(user_id: str, role: str, version: int = 0, signed_in_at: Optional[int] = None) -> str:
     """A sign-in token. `ver` is the person's session number (bumped on log out, so old tokens stop working);
     `auth` is when they signed in (epoch seconds), kept across refreshes so a session can't last forever."""
