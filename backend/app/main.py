@@ -15,7 +15,8 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .config import AUTO_SEED, CORS_ORIGINS, DATABASE_URL, DEV_JWT_SECRET, JWT_SECRET, REMINDER_INTERVAL_MINUTES
+from . import config
+from .config import CORS_ORIGINS, REMINDER_INTERVAL_MINUTES
 from .database import Base, SessionLocal, engine
 from .errors import RuleError, status_for
 from .routers import auth, bookings, jobs, notifications, requests, students, teachers
@@ -33,13 +34,14 @@ if not _app_log.handlers:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # A real database with development defaults is a deployment mistake: stop here, before touching the database.
+    problems = config.unsafe_for_production()
+    if problems:
+        raise RuntimeError("Refusing to start: " + " ".join(problems) + " (Local Postgres with demo data: APP_ENV=development.)")
     # Zero-config development: create tables and demo data on first run.
     # Production deployments should use `alembic upgrade head` instead.
     Base.metadata.create_all(engine)
-    if JWT_SECRET == DEV_JWT_SECRET and not DATABASE_URL.startswith("sqlite"):
-        logging.getLogger("uvicorn.error").warning(
-            "JWT_SECRET is the development default. Set a long random JWT_SECRET before deploying.")
-    if AUTO_SEED:
+    if config.AUTO_SEED:
         db = SessionLocal()
         try:
             from .models import Teacher

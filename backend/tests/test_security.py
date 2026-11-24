@@ -136,3 +136,43 @@ def test_refresh_needs_a_valid_session(client):
     client.post("/auth/logout", headers=bearer(token))
     assert client.post("/auth/refresh", headers=bearer(token)).status_code == 401
     assert client.post("/auth/refresh").status_code == 401
+
+
+# ------------------------------------------------------------------------------------------------ unsafe production settings
+
+@pytest.fixture()
+def real_database(monkeypatch):
+    """Settings as on a deployed server: Postgres, production, safe values. Each test then breaks one."""
+    monkeypatch.setattr(config, "DATABASE_URL", "postgresql://u:p@db.example/office_hours")
+    monkeypatch.setattr(config, "APP_ENV", "production")
+    monkeypatch.setattr(config, "AUTO_SEED", False)
+    monkeypatch.setattr(config, "JWT_SECRET", "x" * 48)
+
+
+def test_safe_production_settings_start(real_database):
+    assert config.unsafe_for_production() == []
+
+
+def test_demo_data_on_a_real_database_refuses_to_start(real_database, monkeypatch):
+    monkeypatch.setattr(config, "AUTO_SEED", True)
+    assert "AUTO_SEED" in " ".join(config.unsafe_for_production())
+    from app.main import app
+    from fastapi.testclient import TestClient
+    with pytest.raises(RuntimeError, match="Refusing to start: AUTO_SEED"):
+        with TestClient(app):
+            pass
+
+
+@pytest.mark.parametrize("secret", ["change-this-development-secret", "short-secret"])
+def test_a_weak_jwt_secret_refuses_to_start(real_database, monkeypatch, secret):
+    monkeypatch.setattr(config, "JWT_SECRET", secret)
+    assert "JWT_SECRET" in " ".join(config.unsafe_for_production())
+
+
+def test_sqlite_and_development_are_allowed(real_database, monkeypatch):
+    monkeypatch.setattr(config, "AUTO_SEED", True)
+    monkeypatch.setattr(config, "APP_ENV", "development")
+    assert config.unsafe_for_production() == []
+    monkeypatch.setattr(config, "APP_ENV", "production")
+    monkeypatch.setattr(config, "DATABASE_URL", "sqlite:///./office_hours.db")
+    assert config.unsafe_for_production() == []

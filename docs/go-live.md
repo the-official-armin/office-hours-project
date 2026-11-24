@@ -180,6 +180,7 @@ Environment Variables (Production).
    | `CRON_SECRET` | new long random value (`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`) |
    | `CLIENT_IP_HEADER` | `x-real-ip` |
    | `REMINDER_INTERVAL_MINUTES` | `0` (or leave unset) |
+   | `APP_ENV` | leave unset (`production`). The backend then **refuses to start** if `AUTO_SEED` is on or `JWT_SECRET` is weak, so a forgotten setting shows as a failed deploy, not a public demo password |
 
 4. **Frontend environment variables**: `VITE_USE_MOCKS=false`, `VITE_API_URL=https://office-hours-project.vercel.app`
    (probably already set: the live site is in real mode).

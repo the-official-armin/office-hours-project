@@ -60,3 +60,22 @@ SESSION_MAX_DAYS = int(os.environ.get("SESSION_MAX_DAYS", "7") or 7)
 # Rate limits count attempts per computer by IP address. Behind a proxy every request seems to come from the proxy, so name
 # the header that carries the visitor's address: "x-real-ip" on Vercel. Empty = the direct connection (local).
 CLIENT_IP_HEADER = os.environ.get("CLIENT_IP_HEADER", "").strip().lower()
+
+# "development" allows the development defaults on a real database (local Postgres with demo data). Anything else, including
+# the default, is treated as production: the backend refuses to start with demo data or a weak JWT_SECRET (see below).
+APP_ENV = os.environ.get("APP_ENV", "production").strip().lower()
+
+
+def unsafe_for_production() -> list:
+    """Development defaults that must never reach a real database. An empty list means safe to start.
+    SQLite (tests, zero-setup development) and APP_ENV=development are never refused."""
+    if DATABASE_URL.startswith("sqlite") or APP_ENV == "development":
+        return []
+    problems = []
+    if AUTO_SEED:
+        problems.append("AUTO_SEED is on, so an empty database would get the demo accounts with their public password. "
+                        "Set AUTO_SEED=false.")
+    if JWT_SECRET == DEV_JWT_SECRET or len(JWT_SECRET) < 32:
+        problems.append("JWT_SECRET is the development default or shorter than 32 characters, so anyone could make "
+                        "sign-in tokens. Set a long random value.")
+    return problems
