@@ -49,18 +49,20 @@ def test_the_lock_lifts_after_fifteen_minutes(client, db):
     assert login(client).status_code == 200
 
 
-def test_one_computer_trying_many_emails_is_limited(client):
-    for i in range(30):
+def test_one_address_trying_many_accounts_is_slowed_but_a_correct_password_still_works(client):
+    # A whole school shares one public address: a classroom of typos must not lock out a teacher with the right password.
+    for i in range(100):
         login(client, email="guess%d@example.com" % i, password="wrong")
-    assert login(client, email="daniel@example.com").status_code == 429
+    assert login(client, email="daniel@example.com", password="also-wrong").status_code == 429
+    assert login(client, email="rivera@example.com").status_code == 200
 
 
 def test_the_visitors_address_comes_from_the_proxy_header_when_set(client, monkeypatch):
     monkeypatch.setattr(config, "CLIENT_IP_HEADER", "x-real-ip")
-    for i in range(30):
+    for i in range(100):
         login(client, email="guess%d@example.com" % i, password="wrong", headers={"X-Real-IP": "203.0.113.9"})
-    assert login(client, email="daniel@example.com", headers={"X-Real-IP": "203.0.113.9"}).status_code == 429
-    assert login(client, email="daniel@example.com", headers={"X-Real-IP": "198.51.100.7"}).status_code == 200
+    assert login(client, email="daniel@example.com", password="x", headers={"X-Real-IP": "203.0.113.9"}).status_code == 429
+    assert login(client, email="daniel@example.com", password="x", headers={"X-Real-IP": "198.51.100.7"}).status_code == 401
 
 
 def test_forgot_password_sends_at_most_three_emails_an_hour(client, outbox):
@@ -72,7 +74,7 @@ def test_forgot_password_sends_at_most_three_emails_an_hour(client, outbox):
 
 
 def test_guessing_links_is_limited(client):
-    for i in range(20):
+    for i in range(60):
         assert client.get("/auth/link/guess-%d" % i).status_code == 410
     assert client.get("/auth/link/guess-x").status_code == 429
     assert client.post("/auth/set-password", json={"token": "x", "password": "a good long password"}).status_code == 429

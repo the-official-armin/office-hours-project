@@ -31,18 +31,22 @@ def _session(user, role: str, signed_in_at=None):
 
 @router.post("/login")
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
-    """Email + password. One answer for every failure (unknown email, wrong password, not activated, deactivated)."""
+    """Email + password. One answer for every failure (unknown email, wrong password, not activated, deactivated).
+
+    Limits: too many wrong passwords for one account lock that account for a while (checked first). The limit per
+    address only ever turns away *wrong* passwords: a whole school shares one public address, so a classroom of typos
+    must not keep a teacher with the right password out."""
     email, ip = accounts.normalize_email(body.email), ratelimit.client_ip(request)
     ratelimit.check(db, "login-email", email)
-    ratelimit.check(db, "login-ip", ip)
     found = accounts.find_by_email(db, email)
-    if (found is None or found[0].status != STATUS_ACTIVE
-            or not verify_password(body.password, found[0].password_hash)):
-        ratelimit.record(db, "login-email", email)
-        ratelimit.record(db, "login-ip", ip)
-        raise RuleError("invalid_credentials", "Invalid email or password.")
-    user, role = found
-    return _session(user, role)
+    if (found is not None and found[0].status == STATUS_ACTIVE
+            and verify_password(body.password, found[0].password_hash)):
+        user, role = found
+        return _session(user, role)
+    ratelimit.record(db, "login-email", email)
+    ratelimit.record(db, "login-ip", ip)
+    ratelimit.check(db, "login-ip", ip)
+    raise RuleError("invalid_credentials", "Invalid email or password.")
 
 
 @router.get("/me")

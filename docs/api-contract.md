@@ -144,8 +144,9 @@ Matches `backend/README.md` and `backend/app/routers/auth.py`. **Accounts are in
 - A `403` is not treated as "session ended": the token is fine, the role is wrong.
 
 **Rate limits** (`backend/app/ratelimit.py`, kept in the database): `429 too_many` ("Too many tries. Wait a few minutes and
-try again.") after 10 failed sign-ins for one email or 30 from one computer in 15 minutes, 3 forgot-password emails per address
-or 20 requests per computer in an hour, and 20 unusable links per computer in 15 minutes.
+try again.") after 10 wrong passwords for one account in 15 minutes (even the right password then waits), and 3 forgot-password
+emails per address per hour. Per public address (a school shares one): 100 wrong passwords in 15 minutes (after that only wrong
+passwords are turned away, never a correct one), 100 forgot-password requests per hour, 60 unusable links in 15 minutes.
 
 **Sessions**: a token lasts 60 minutes; in its last 10 minutes the app swaps it for a fresh one before the next request
 (`POST /auth/refresh`), for up to 7 days after signing in. Log out calls `POST /auth/logout`. Choosing a new password or being

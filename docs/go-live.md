@@ -111,16 +111,17 @@ On the live site:
 
 ## Step 7: security (local done)
 
-Built: rate limits kept in the database (`app/ratelimit.py`): 10 failed sign-ins per email / 30 per computer in 15 minutes,
-3 forgot-password emails per address per hour, 20 unusable links per computer in 15 minutes, all answering `429`.
+Built: rate limits kept in the database (`app/ratelimit.py`): 10 wrong passwords per account in 15 minutes, 3 forgot-password
+emails per address per hour, all answering `429`. Limits per public address (a whole school shares one) are generous
+(100 wrong passwords / 15 min, 100 reset requests / hour, 60 bad links / 15 min) and never stop a correct password.
 Log out ends every session of the person at once (`POST /auth/logout`), and so do a new password and deactivation.
 While the app is in use the token is refreshed before it runs out (`POST /auth/refresh`), for up to 7 days after signing in.
 Migration `0005` adds `session_version` and `auth_attempts`.
 
 On the live site:
 - [ ] Run `alembic upgrade head` (0005) against the live database. Nobody is signed out by it.
-- [ ] Backend env var `CLIENT_IP_HEADER=x-real-ip`. Without it every visitor looks like the same address to the rate limits,
-      and 30 wrong passwords from anyone would lock sign-in for everybody for 15 minutes.
+- [ ] Backend env var `CLIENT_IP_HEADER=x-real-ip`. Without it every visitor looks like Vercel's own address, so everyone
+      everywhere shares one per-address limit (a correct password still always works).
 - [ ] Optional: `SESSION_MAX_DAYS` (7 by default).
 - [ ] **Blocker, from the top of this file:** `JWT_SECRET` must be a long random value. Anyone who knows the secret can make
       a token for any account, and the default one is in the public code.

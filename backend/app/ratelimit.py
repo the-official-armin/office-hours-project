@@ -15,12 +15,14 @@ from .errors import RuleError
 from .models import AuthAttempt
 
 # kind -> (most attempts allowed, within this many minutes)
+# The "-ip" limits are per public address, and a whole school shares one, so they are generous and only slow down
+# someone trying many accounts. They never stop a correct password (see routers/auth.py login).
 LIMITS = {
-    "login-email": (10, 15),   # failed sign-ins for one email
-    "login-ip": (30, 15),      # failed sign-ins from one computer
+    "login-email": (10, 15),   # wrong passwords for one account: the real protection against guessing
+    "login-ip": (100, 15),     # wrong passwords from one address (a school): only wrong ones are turned away
     "forgot-email": (3, 60),   # reset emails to one address
-    "forgot-ip": (20, 60),     # reset requests from one computer
-    "link-ip": (20, 15),       # unusable activation/reset links tried from one computer
+    "forgot-ip": (100, 60),    # reset requests from one address (a school)
+    "link-ip": (60, 15),       # unusable activation/reset links from one address (a school)
 }
 KEEP_HOURS = 24
 
