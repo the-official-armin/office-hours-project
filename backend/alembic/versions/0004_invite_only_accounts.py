@@ -4,7 +4,8 @@ Revision ID: 0004_invite_only_accounts
 Revises: 0003_one_booking_per_student
 
 Existing accounts stay active. Their emails are lowercased, and empty ones (the demo seed had none) become
-"<id>@example.com" so every account has a unique sign-in email. The upgrade stops if two accounts share an email.
+"<id>@example.com" so every account has a unique sign-in email. The upgrade stops, changing nothing, if two accounts share
+an email: two teachers, two students, or a teacher and a student (sign-in looks in both tables).
 """
 from typing import Sequence, Union
 
@@ -18,7 +19,21 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _shared_emails(bind) -> list:
+    """Sign-in emails used by more than one account, across both tables (after lowercasing)."""
+    return list(bind.execute(sa.text(
+        "SELECT email FROM (SELECT lower(trim(email)) AS email FROM teachers WHERE trim(email) <> '' "
+        "UNION ALL SELECT lower(trim(email)) FROM students WHERE trim(email) <> '') AS everyone "
+        "GROUP BY email HAVING count(*) > 1 ORDER BY email"
+    )).scalars())
+
+
 def upgrade() -> None:
+    shared = _shared_emails(op.get_bind())
+    if shared:
+        raise RuntimeError(
+            "Upgrade stopped, nothing changed: these emails belong to more than one account (teachers and students "
+            "together): %s. Give each account its own email, then run the upgrade again." % ", ".join(shared))
     for table in ("teachers", "students"):
         op.execute("UPDATE %s SET email = lower(trim(email))" % table)
         op.execute("UPDATE %s SET email = id || '@example.com' WHERE email = ''" % table)

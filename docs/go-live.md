@@ -61,7 +61,8 @@ On the live site:
 - [ ] **Tell the backend team** before merging: `0004` changes their `teachers` and `students` tables, and sign-in moves from
       user ID to email (the old `{role, userId, password}` login stops working).
 - [ ] Run `alembic upgrade head` against the live database. It lowercases emails, gives accounts without one
-      `<id>@example.com`, and **stops if two accounts share an email**: check first.
+      `<id>@example.com`, and **stops without changing anything if two accounts share an email** (two teachers, two
+      students, or a teacher and a student, since sign-in looks in both): the message lists them.
 - [ ] Backend env var `APP_URL=https://office-hours-project-hhbz.vercel.app`, or the links in invite emails point to localhost.
 - [ ] Remove the demo accounts: `AUTO_SEED=false`, then empty the demo data (a fresh database, or delete the demo rows).
       Their password is public.
