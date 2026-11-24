@@ -10,11 +10,12 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple, Union
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from . import config, mailer, rules
+from .deps import now_local, push_note
 from .errors import RuleError
-from .models import (STATUS_ACTIVE, STATUS_DEACTIVATED, STATUS_INVITED, AccountLink, Student, Teacher)
+from .models import (STATUS_ACTIVE, STATUS_DEACTIVATED, STATUS_INVITED, AccountLink, Booking, Student, Teacher)
 from .security import hash_password
 
 Person = Union[Teacher, Student]
@@ -197,8 +198,40 @@ def resend_invite(db: Session, email: str) -> Person:
     return person
 
 
-def set_status(db: Session, email: str, status: str) -> Person:
-    """Deactivate (sign-in and open links stop working at once) or reactivate an account."""
+def _cancel_upcoming_bookings(db: Session, person: Person, role: str) -> int:
+    """Cancels the person's confirmed bookings that haven't started (a deactivated student's spots open up again; a
+    deactivated teacher's office hours won't happen) and tells the other side. Past bookings stay on record."""
+    now = now_local()
+    mine = Booking.student_id if role == "student" else Booking.teacher_id
+    rows = (db.query(Booking)
+            .options(joinedload(Booking.timing), joinedload(Booking.student))
+            .filter(mine == person.id, Booking.status == "confirmed", Booking.date >= now.date())
+            .all())
+    cancelled = 0
+    for b in rows:
+        if b.timing is not None and datetime.combine(b.date, b.timing.start_time) <= now:
+            continue  # already started or over: stays on record
+        b.status = "cancelled"
+        cancelled += 1
+        what = "%s on %s" % (b.timing.name if b.timing else "an office hour", rules.format_date_short(b.date))
+        if role == "student":
+            teacher = db.get(Teacher, b.teacher_id)
+            if teacher is not None:
+                push_note(db, "%s's account was closed, so their spot in %s is open again." % (person.name, what),
+                          teacher_id=teacher.id, enabled=teacher.cancel,
+                          subject="Cancelled: %s, %s" % (person.name, rules.format_date_short(b.date)),
+                          link="/teacher/calendar", tag="cancel")
+        elif b.student is not None and b.student.status == STATUS_ACTIVE:
+            push_note(db, "%s no longer holds office hours here, so your booking in %s was cancelled." % (person.name, what),
+                      student_id=b.student_id, enabled=b.student.out,
+                      subject="Cancelled: %s, %s" % (person.name, rules.format_date_short(b.date)),
+                      link="/student/teachers", tag="out")
+    return cancelled
+
+
+def set_status(db: Session, email: str, status: str) -> Tuple[Person, int]:
+    """Deactivate (sign-in, open sessions and links stop working at once, and upcoming bookings are cancelled) or
+    reactivate an account (cancelled bookings stay cancelled). Returns the person and how many bookings were cancelled."""
     found = find_by_email(db, email)
     if not found:
         raise RuleError("not_found", "No account for %s." % normalize_email(email))
@@ -210,8 +243,9 @@ def set_status(db: Session, email: str, status: str) -> Person:
     (db.query(AccountLink)
        .filter(AccountLink.role == role, AccountLink.user_id == person.id, AccountLink.used_at.is_(None))
        .update({AccountLink.used_at: utcnow()}, synchronize_session=False))
-    db.commit()
-    return person
+    cancelled = _cancel_upcoming_bookings(db, person, role) if status == STATUS_DEACTIVATED else 0
+    db.commit()  # the notices' emails go out here (app/outbox.py)
+    return person, cancelled
 
 
 def forgot_password(db: Session, email: str) -> None:

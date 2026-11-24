@@ -66,8 +66,10 @@ def one(action: str, email: str) -> int:
             person = accounts.resend_invite(db, email)
             print("New activation link sent to %s." % person.email)
         else:
-            person = accounts.set_status(db, email, STATUS_DEACTIVATED if action == "deactivate" else STATUS_ACTIVE)
+            person, cancelled = accounts.set_status(db, email, STATUS_DEACTIVATED if action == "deactivate" else STATUS_ACTIVE)
             print("%s is now %s." % (person.email, person.status))
+            if cancelled:
+                print("%d upcoming booking%s cancelled; the other side was told." % (cancelled, "" if cancelled == 1 else "s"))
         return 0
     except RuleError as err:
         print(err.message)

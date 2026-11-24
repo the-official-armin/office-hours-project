@@ -110,7 +110,8 @@ venv/bin/python -m app.invite --reactivate maya@waprep.org
 venv/bin/python -m app.invite --list
 ```
 
-Deactivating stops sign-in and open sessions at once; bookings stay on record.
+Deactivating stops sign-in and open sessions at once and cancels the person's upcoming bookings (the teacher, or the
+students, are told); past bookings stay on record. Reactivating doesn't restore cancelled bookings.
 
 Set `JWT_SECRET` to a long random value in deployment. Tokens expire after
 `JWT_EXPIRE_MINUTES` (60 by default). Run `alembic upgrade head` before starting

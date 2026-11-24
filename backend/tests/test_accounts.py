@@ -1,12 +1,13 @@
 """Invite-only accounts: invite -> activation email -> choose a password -> signed in; sign-in by email; forgot password;
 deactivation; the developer command. Emails are captured, never sent."""
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pytest
 
 from app import accounts, config, invite, mailer
 from app.models import AccountLink, Student, Teacher
+from tests.test_api import NEXT_THU, _book
 
 
 @pytest.fixture()
@@ -210,3 +211,49 @@ def test_invite_command_needs_the_header(tmp_path, capsys):
     csv_file.write_text("Ava Chen,ava@waprep.org,student\n")
     assert invite.main([str(csv_file)]) == 2
     assert "header row" in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------------------------------------ deactivation frees spots
+
+def _upcoming(db, **who):
+    from app.models import Booking
+    return db.query(Booking).filter_by(status="confirmed", **who).filter(Booking.date >= date.today()).all()
+
+
+def test_deactivating_a_student_cancels_their_upcoming_bookings_and_tells_the_teacher(student, db, monkeypatch):
+    batches = []
+    monkeypatch.setattr(mailer, "send_many", lambda messages: batches.append(list(messages)) or len(messages))
+    assert _book(student, date=NEXT_THU).status_code == 200
+    held = _upcoming(db, student_id="maya")
+    assert held
+    batches.clear()
+
+    person, cancelled = accounts.set_status(db, "maya@example.com", "deactivated")
+    assert cancelled == len(held) and _upcoming(db, student_id="maya") == []
+    rivera = [m for b in batches for m in b if m.to == "rivera@example.com"]
+    assert rivera and rivera[0].subject.startswith("Cancelled: Maya K., ")
+    assert "account was closed" in rivera[0].text
+    # Past bookings stay on record.
+    from app.models import Booking
+    assert db.query(Booking).filter(Booking.student_id == "maya", Booking.date < date.today()).count() > 0
+    # Reactivating doesn't bring the spots back.
+    accounts.set_status(db, "maya@example.com", "active")
+    assert _upcoming(db, student_id="maya") == []
+
+
+def test_deactivating_a_teacher_cancels_bookings_with_them_and_tells_the_students(db, monkeypatch):
+    batches = []
+    monkeypatch.setattr(mailer, "send_many", lambda messages: batches.append(list(messages)) or len(messages))
+    booked = {b.student_id for b in _upcoming(db, teacher_id="rivera")}
+    assert booked
+    person, cancelled = accounts.set_status(db, "rivera@example.com", "deactivated")
+    assert cancelled > 0 and _upcoming(db, teacher_id="rivera") == []
+    told = {m.to for b in batches for m in b}
+    assert told == {"%s@example.com" % s for s in booked}
+    assert all("no longer holds office hours" in m.text for b in batches for m in b)
+
+
+def test_the_command_says_how_many_bookings_were_cancelled(db, capsys):
+    assert invite.main(["--deactivate", "rivera@example.com"]) == 0
+    out = capsys.readouterr().out
+    assert "rivera@example.com is now deactivated." in out and "upcoming booking" in out
