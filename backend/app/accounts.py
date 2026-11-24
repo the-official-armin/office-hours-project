@@ -110,13 +110,26 @@ def read_link(db: Session, token: str) -> Tuple[AccountLink, Person, str]:
 
 
 def use_link(db: Session, token: str, password: str) -> Tuple[Person, str]:
-    """Sets the password from an activation or reset link, activates the account, and spends the link."""
+    """Sets the password from an activation or reset link, activates the account, and spends the link, and every other
+    open link of this person, in the same commit."""
     link, person, role = read_link(db, token)
     check_password(password, person.email)
+    now = utcnow()
+    # Claim the link in one statement: of two requests using it (or two sibling links) at the same moment, only one
+    # matches "still unused"; the other waits for it on Postgres and then finds nothing to claim.
+    claimed = (db.query(AccountLink)
+               .filter(AccountLink.id == link.id, AccountLink.used_at.is_(None))
+               .update({AccountLink.used_at: now}, synchronize_session=False))
+    if claimed != 1:
+        db.rollback()
+        raise RuleError("link_invalid", "This link has expired or was already used.")
+    # Two "forgot password" requests at once can both leave a live link; using one burns the rest.
+    (db.query(AccountLink)
+       .filter(AccountLink.role == role, AccountLink.user_id == person.id, AccountLink.used_at.is_(None))
+       .update({AccountLink.used_at: now}, synchronize_session=False))
     person.password_hash = hash_password(password)
     person.status = STATUS_ACTIVE
     person.session_version += 1  # a new password signs out every other device
-    link.used_at = utcnow()
     db.commit()
     return person, role
 

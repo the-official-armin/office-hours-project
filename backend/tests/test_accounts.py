@@ -276,3 +276,42 @@ def test_an_invite_email_that_fails_is_reported_and_the_command_fails(tmp_path, 
     monkeypatch.setattr(mailer, "send_email", lambda message: True)
     assert invite.main(["--resend", "ava.chen@waprep.org"]) == 0
     assert "New activation link sent to ava.chen@waprep.org." in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------------------------------------ one link wins
+
+def _open_link(db, purpose, user_id="maya", role="student"):
+    """An unused link added straight to the table, as two "forgot password" requests at the same moment would leave."""
+    token = "tok-%s-%d" % (purpose, db.query(AccountLink).count())
+    now = accounts.utcnow()
+    db.add(AccountLink(token_hash=accounts._hash(token), purpose=purpose, role=role, user_id=user_id,
+                       expires_at=now + timedelta(hours=1), created_at=now))
+    db.commit()
+    return token
+
+
+def test_using_one_reset_link_burns_its_siblings(client, db):
+    first, second = _open_link(db, "reset"), _open_link(db, "reset")
+    assert client.get("/auth/link/" + second).status_code == 200  # both live, as after a race
+    assert client.post("/auth/set-password", json={"token": first, "password": "a good long password"}).status_code == 200
+    assert client.get("/auth/link/" + second).status_code == 410
+    res = client.post("/auth/set-password", json={"token": second, "password": "another long password"})
+    assert res.status_code == 410
+    assert login(client, "maya@example.com", "a good long password").status_code == 200
+
+
+def test_a_link_used_at_the_same_moment_only_works_once(client, db, monkeypatch):
+    token = _open_link(db, "reset")
+    real_read = accounts.read_link
+
+    def read_then_lose_the_race(db_, token_):
+        found = real_read(db_, token_)
+        # Another request spends the link between our read and our claim.
+        db_.query(AccountLink).filter(AccountLink.id == found[0].id).update({AccountLink.used_at: accounts.utcnow()})
+        return found
+
+    monkeypatch.setattr(accounts, "read_link", read_then_lose_the_race)
+    res = client.post("/auth/set-password", json={"token": token, "password": "a good long password"})
+    assert res.status_code == 410 and res.json()["code"] == "link_invalid"
+    monkeypatch.setattr(accounts, "read_link", real_read)
+    assert login(client, "maya@example.com", "demo-password").status_code == 200  # password unchanged
