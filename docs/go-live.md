@@ -126,6 +126,9 @@ On the live site:
 - [ ] **Blocker, from the top of this file:** `JWT_SECRET` must be a long random value. Anyone who knows the secret can make
       a token for any account, and the default one is in the public code.
 - [ ] Old `auth_attempts` rows are deleted by the reminder job, so the step 6 timer must be running.
+- Forgot password always answers after 2 seconds (`FORGOT_PASSWORD_SECONDS`), account or not. If Postmark is ever slower than
+  that, the answer still goes out on time and the email follows; on Vercel a function can be paused after it answers, so watch
+  Postmark → Activity for reset emails that never arrive in the first week.
 - Known limit: the sign-in token is kept in the browser's storage (as before), where a script injected into the page could
   read it. An `httpOnly` cookie would be the next step if the school asks for it.
 

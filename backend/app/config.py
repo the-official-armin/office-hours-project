@@ -79,3 +79,7 @@ def unsafe_for_production() -> list:
         problems.append("JWT_SECRET is the development default or shorter than 32 characters, so anyone could make "
                         "sign-in tokens. Set a long random value.")
     return problems
+
+# Forgot password always answers after this many seconds, whether or not the email has an account, so the response time
+# doesn't tell. The lookup and the email run meanwhile; a slow Postmark doesn't hold the answer back (the email follows).
+FORGOT_PASSWORD_SECONDS = float(os.environ.get("FORGOT_PASSWORD_SECONDS", "2") or 2)

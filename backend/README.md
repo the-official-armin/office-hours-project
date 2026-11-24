@@ -60,6 +60,7 @@ All settings are environment variables; `.env.example` lists them with comments.
 | `EMAIL_FROM` | empty | A confirmed Postmark sender, e.g. `noreply@waprep.org` |
 | `APP_URL` | `http://localhost:5173` | The frontend's URL (links in emails) |
 | `APP_ENV` | `production`: on a real database, refuses to start with `AUTO_SEED` on or a weak `JWT_SECRET` | `production` (`development` only for local Postgres with demo data) |
+| `FORGOT_PASSWORD_SECONDS` | `2` | `2`: forgot password always answers after this long, account or not |
 | `SESSION_MAX_DAYS` | `7` | `7`: how long `POST /auth/refresh` keeps a sign-in going |
 | `CLIENT_IP_HEADER` | empty (the direct connection) | `x-real-ip` on Vercel, so rate limits see each visitor's address |
 | `CRON_SECRET` | empty: `/jobs/reminders` is off | A long random value; the timer sends it as `Authorization: Bearer …` |

@@ -114,6 +114,36 @@ def test_every_failed_sign_in_runs_the_password_check(client, db, outbox, monkey
     assert len(calls) == 1 and calls[0].startswith("scrypt$")
 
 
+def test_forgot_password_takes_the_same_time_whether_or_not_the_account_exists(client, outbox, monkeypatch):
+    monkeypatch.setattr(config, "FORGOT_PASSWORD_SECONDS", 0.4)
+    times = {}
+    for email in ("maya@example.com", "nobody@example.com"):
+        start = time.monotonic()
+        assert client.post("/auth/forgot-password", json={"email": email}).status_code == 204
+        times[email] = time.monotonic() - start
+    assert all(0.4 <= t < 0.7 for t in times.values()), times
+    assert [m.to for m in outbox] == ["maya@example.com"]
+
+
+def test_a_slow_postmark_does_not_hold_the_answer_back(client, monkeypatch):
+    monkeypatch.setattr(config, "FORGOT_PASSWORD_SECONDS", 0.3)
+    sent = []
+
+    def slow_send(message):
+        time.sleep(1.0)
+        sent.append(message)
+        return True
+
+    monkeypatch.setattr(mailer, "send_email", slow_send)
+    start = time.monotonic()
+    assert client.post("/auth/forgot-password", json={"email": "maya@example.com"}).status_code == 204
+    assert time.monotonic() - start < 0.8  # answered on time, not after Postmark
+    deadline = time.monotonic() + 3
+    while not sent and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert [m.to for m in sent] == ["maya@example.com"]  # and the email still went out
+
+
 def maya_hash(db):
     from app.models import Student
     return db.get(Student, "maya").password_hash

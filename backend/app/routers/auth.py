@@ -1,11 +1,15 @@
 """Authentication endpoints. Accounts are invite-only (app/accounts.py): no sign-up here.
 Sign-in, password links and forgot password are rate limited (app/ratelimit.py)."""
+import asyncio
+import logging
 import time
 
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from .. import accounts, ratelimit
+from .. import accounts, config, ratelimit
+from ..database import SessionLocal
 from ..config import JWT_EXPIRE_MINUTES, SESSION_MAX_DAYS
 from ..deps import CurrentUser, current_user, get_db
 from ..errors import RuleError
@@ -14,6 +18,7 @@ from ..schemas import ForgotPasswordIn, LoginIn, SetPasswordIn
 from ..security import DUMMY_PASSWORD_HASH, create_access_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+log = logging.getLogger("office_hours.auth")
 
 
 def _public_user(user, role: str):
@@ -102,13 +107,38 @@ def set_password(body: SetPasswordIn, request: Request, db: Session = Depends(ge
     return _session(person, role)
 
 
+def _count_forgot_request(email: str, ip: str) -> None:
+    db = SessionLocal()
+    try:
+        ratelimit.check(db, "forgot-email", email)
+        ratelimit.check(db, "forgot-ip", ip)
+        ratelimit.record(db, "forgot-email", email)
+        ratelimit.record(db, "forgot-ip", ip)
+    finally:
+        db.close()
+
+
+def _send_reset_link(email: str) -> None:
+    """Looks the email up and sends a reset link (or a new invite). Its own session: it may outlive the request."""
+    db = SessionLocal()
+    try:
+        accounts.forgot_password(db, email)
+    except Exception:  # never surfaces to the caller, who already got (or will get) the same 204
+        log.exception("Forgot password: sending to %s failed", email)
+    finally:
+        db.close()
+
+
 @router.post("/forgot-password", status_code=204)
-def forgot_password(body: ForgotPasswordIn, request: Request, db: Session = Depends(get_db)):
-    """Always 204 (unless rate limited), so nobody can find out which emails have accounts."""
+async def forgot_password(body: ForgotPasswordIn, request: Request):
+    """Always 204 after the same FORGOT_PASSWORD_SECONDS (unless rate limited), so neither the answer nor the time it takes
+    tells anyone which emails have accounts. The lookup and the email happen meanwhile; if Postmark is slower than that,
+    the answer still goes out on time and the email follows."""
+    started = time.monotonic()
     email, ip = accounts.normalize_email(body.email), ratelimit.client_ip(request)
-    ratelimit.check(db, "forgot-email", email)
-    ratelimit.check(db, "forgot-ip", ip)
-    ratelimit.record(db, "forgot-email", email)
-    ratelimit.record(db, "forgot-ip", ip)
-    accounts.forgot_password(db, email)
+    await run_in_threadpool(_count_forgot_request, email, ip)  # 429 here says nothing about the account
+    work = asyncio.get_running_loop().run_in_executor(None, _send_reset_link, email)
+    budget = config.FORGOT_PASSWORD_SECONDS
+    await asyncio.wait({work}, timeout=max(0.0, budget - (time.monotonic() - started)))
+    await asyncio.sleep(max(0.0, budget - (time.monotonic() - started)))
     return Response(status_code=204)

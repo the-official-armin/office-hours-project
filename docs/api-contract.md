@@ -122,7 +122,7 @@ Matches `backend/README.md` and `backend/app/routers/auth.py`. **Accounts are in
 | POST | `/auth/set-password` | `{ "token": string, "password": string }` | `200`, same as `/auth/login`: the person is signed in, and an invited account becomes active | `410 link_invalid`; `422 weak_password` (under 10 or over 128 characters, or the email itself) |
 | POST | `/auth/refresh` | header `Authorization: Bearer <accessToken>` | `200`, same as `/auth/login`, for the same sign-in: a fresh token while the session is in use | `401 unauthorized` (bad or ended token, or more than 7 days since signing in) |
 | POST | `/auth/logout` | header `Authorization: Bearer <accessToken>` | `204`. Ends every session of this person on every device: all their tokens stop working at once | `401 unauthorized` |
-| POST | `/auth/forgot-password` | `{ "email": string }` | `204` always, whether or not the email has an account. An active account gets a reset link (1 hour); one that never activated gets a new invite (7 days) | `422` for a malformed body |
+| POST | `/auth/forgot-password` | `{ "email": string }` | `204` always, whether or not the email has an account, and always after the same time (`FORGOT_PASSWORD_SECONDS`, 2 by default), so neither the answer nor its timing tells. An active account gets a reset link (1 hour); one that never activated gets a new invite (7 days) | `422` for a malformed body |
 | GET | `/auth/me` | header `Authorization: Bearer <accessToken>` | `200` `{ "id", "role", "name" }` | `401 unauthorized` |
 
 **What the frontend does with it**
