@@ -4,7 +4,7 @@ import pytest
 
 from app import mailer
 from app.models import Student, Teacher
-from tests.test_api import NEXT_MON, NEXT_THU, RIVR3, _book
+from tests.test_api import NEXT_MON, OPEN_DAY, RIVR3, _book
 
 
 @pytest.fixture()
@@ -20,7 +20,7 @@ def emails(batches):
 
 
 def test_a_booking_emails_the_teacher_and_confirms_to_the_student(student, sent):
-    assert _book(student, date=NEXT_THU).status_code == 200
+    assert _book(student, date=OPEN_DAY).status_code == 200
     assert len(sent) == 1  # one batch, sent after the booking was saved
     by_to = {m.to: m for m in sent[0]}
     teacher_mail, student_mail = by_to["rivera@example.com"], by_to["maya@example.com"]
@@ -33,9 +33,9 @@ def test_a_booking_emails_the_teacher_and_confirms_to_the_student(student, sent)
 
 
 def test_a_refused_booking_sends_nothing(student, sent):
-    assert _book(student, date=NEXT_THU).status_code == 200
+    assert _book(student, date=OPEN_DAY).status_code == 200
     sent.clear()
-    again = _book(student, date=NEXT_THU)
+    again = _book(student, date=OPEN_DAY)
     assert again.json()["code"] == "already_booked"
     assert sent == []
 
@@ -44,12 +44,12 @@ def test_emails_follow_each_persons_settings(student, db, sent):
     db.get(Teacher, "rivera").booking = False
     db.get(Student, "maya").booked = False
     db.commit()
-    assert _book(student, date=NEXT_THU).status_code == 200
+    assert _book(student, date=OPEN_DAY).status_code == 200
     assert emails(sent) == []
 
 
 def test_cancelling_emails_the_teacher(student, sent):
-    booking = _book(student, date=NEXT_THU).json()
+    booking = _book(student, date=OPEN_DAY).json()
     sent.clear()
     assert student.delete("/bookings/%s" % booking["id"]).status_code == 204
     [mail] = emails(sent)

@@ -1,6 +1,6 @@
 """Step 6: reminder emails (app/reminders.py) and the timer endpoint. The clock is passed in, emails are captured.
 
-The office hour used throughout: Ms. Rivera's Lunch (12:10) next Thursday, where the seed has two students booked and Maya
+The office hour used throughout: Ms. Rivera's Lunch (12:10) on OPEN_DAY, where the seed has two students booked and Maya
 books a third spot. Everyone's reminder time is the default, 1 hour.
 """
 from datetime import datetime, time
@@ -9,7 +9,7 @@ import pytest
 
 from app import config, mailer, reminders
 from app.models import DayOff, Notification, Student, Teacher
-from tests.test_api import NEXT_THU, _book
+from tests.test_api import OPEN_DAY, _book
 
 
 @pytest.fixture()
@@ -19,7 +19,7 @@ def sent(monkeypatch):
     return batches
 
 
-def at(hour, minute=0, day=NEXT_THU):
+def at(hour, minute=0, day=OPEN_DAY):
     return datetime.combine(day, time(hour, minute))
 
 
@@ -29,8 +29,8 @@ def mails(batches, to=None):
 
 @pytest.fixture()
 def booked(student, sent):
-    """Maya books next Thursday's Lunch with Ms. Rivera."""
-    assert _book(student, date=NEXT_THU).status_code == 200
+    """Maya books OPEN_DAY's Lunch with Ms. Rivera."""
+    assert _book(student, date=OPEN_DAY).status_code == 200
     sent.clear()
 
 
@@ -87,9 +87,9 @@ def test_no_reminder_once_it_started_after_a_cancel_or_on_a_day_off(db, student,
     assert reminders.run(db, now=at(12, 15)) == {}  # already started
 
     maya = next(b for b in student.get("/bookings?view=student").json()
-                if b["date"] == NEXT_THU.isoformat() and b["status"] == "confirmed")
+                if b["date"] == OPEN_DAY.isoformat() and b["status"] == "confirmed")
     student.delete("/bookings/%s" % maya["id"])
-    db.add(DayOff(teacher_id="rivera", date=NEXT_THU, reason="Conference"))
+    db.add(DayOff(teacher_id="rivera", date=OPEN_DAY, reason="Conference"))
     db.commit()
     sent.clear()
     reminders.run(db, now=at(11, 30))

@@ -7,7 +7,7 @@ import pytest
 
 from app import accounts, config, invite, mailer
 from app.models import AccountLink, Student, Teacher
-from tests.test_api import NEXT_THU, _book
+from tests.test_api import OPEN_DAY, _book
 
 
 @pytest.fixture()
@@ -223,7 +223,7 @@ def _upcoming(db, **who):
 def test_deactivating_a_student_cancels_their_upcoming_bookings_and_tells_the_teacher(student, db, monkeypatch):
     batches = []
     monkeypatch.setattr(mailer, "send_many", lambda messages: batches.append(list(messages)) or len(messages))
-    assert _book(student, date=NEXT_THU).status_code == 200
+    assert _book(student, date=OPEN_DAY).status_code == 200
     held = _upcoming(db, student_id="maya")
     assert held
     batches.clear()
