@@ -22,7 +22,7 @@ import logging
 import sys
 from typing import List
 
-from . import accounts
+from . import accounts, config
 from .database import Base, SessionLocal, engine
 from .errors import RuleError
 from .models import STATUS_ACTIVE, STATUS_DEACTIVATED, Student, Teacher
@@ -36,15 +36,21 @@ def invite_file(path: str) -> int:
         print("The file needs a header row with name, email and role (missing: %s)." % ", ".join(sorted(missing)))
         return 2
 
+    _say_where_emails_go()
     invited = skipped = failed = 0
+    not_sent: List[str] = []
     db = SessionLocal()
     try:
         for line, row in enumerate(rows, start=2):
             try:
-                person = accounts.invite(db, row["name"], row["email"], row["role"].lower(),
-                                         grade=row.get("grade", ""), subject=row.get("subject", ""), group=row.get("group", ""))
+                person, sent = accounts.invite(db, row["name"], row["email"], row["role"].lower(),
+                                               grade=row.get("grade", ""), subject=row.get("subject", ""),
+                                               group=row.get("group", ""))
                 invited += 1
-                print("invited   %-8s %s (%s)" % (row["role"].lower(), person.email, person.id))
+                print("invited   %-8s %s (%s)%s" % (row["role"].lower(), person.email, person.id,
+                                                   "" if sent else "  EMAIL NOT SENT"))
+                if not sent:
+                    not_sent.append(person.email)
             except RuleError as err:
                 db.rollback()
                 if err.code == "email_taken":
@@ -56,14 +62,27 @@ def invite_file(path: str) -> int:
     finally:
         db.close()
     print("\n%d invited, %d already had an account, %d with errors." % (invited, skipped, failed))
-    return 1 if failed else 0
+    if not_sent:
+        print("\n%d invite email%s NOT sent (the reason is in the log above): %s" % (
+            len(not_sent), "" if len(not_sent) == 1 else "s", ", ".join(not_sent)))
+        print("The accounts exist. Fix the problem, then: python -m app.invite --resend <email>")
+    return 1 if failed or not_sent else 0
+
+
+def _say_where_emails_go() -> None:
+    if not config.POSTMARK_TOKEN:
+        print("POSTMARK_TOKEN is empty: invite emails are written to the log, not sent.\n")
 
 
 def one(action: str, email: str) -> int:
     db = SessionLocal()
     try:
         if action == "resend":
-            person = accounts.resend_invite(db, email)
+            _say_where_emails_go()
+            person, sent = accounts.resend_invite(db, email)
+            if not sent:
+                print("The new activation link for %s was NOT sent (the reason is in the log above)." % person.email)
+                return 1
             print("New activation link sent to %s." % person.email)
         else:
             person, cancelled = accounts.set_status(db, email, STATUS_DEACTIVATED if action == "deactivate" else STATUS_ACTIVE)

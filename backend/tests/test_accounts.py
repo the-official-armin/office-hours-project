@@ -30,7 +30,7 @@ def login(client, email, password):
 
 
 def invite_ava(db, role="student"):
-    return accounts.invite(db, "Ava Chen", "  Ava.Chen@WAPREP.org ", role, grade="Grade 9", subject="Physics")
+    return accounts.invite(db, "Ava Chen", "  Ava.Chen@WAPREP.org ", role, grade="Grade 9", subject="Physics")[0]
 
 
 def test_the_whole_journey_invite_activate_sign_in(client, db, outbox):
@@ -61,9 +61,9 @@ def test_the_whole_journey_invite_activate_sign_in(client, db, outbox):
 
 
 def test_a_new_teacher_gets_no_office_hours_and_a_filter_group(db, outbox):
-    t = accounts.invite(db, "Ana Rivera", "ana.rivera@waprep.org", "teacher", subject="Mathematics", group="Math")
+    t, _ = accounts.invite(db, "Ana Rivera", "ana.rivera@waprep.org", "teacher", subject="Mathematics", group="Math")
     assert isinstance(t, Teacher) and (t.subject, t.subject_group, t.timings) == ("Mathematics", "Math", [])
-    other = accounts.invite(db, "Bo Li", "bo.li@waprep.org", "teacher", subject="Art")
+    other, _ = accounts.invite(db, "Bo Li", "bo.li@waprep.org", "teacher", subject="Art")
     assert other.subject_group == "Art"
 
 
@@ -257,3 +257,22 @@ def test_the_command_says_how_many_bookings_were_cancelled(db, capsys):
     assert invite.main(["--deactivate", "rivera@example.com"]) == 0
     out = capsys.readouterr().out
     assert "rivera@example.com is now deactivated." in out and "upcoming booking" in out
+
+
+def test_an_invite_email_that_fails_is_reported_and_the_command_fails(tmp_path, db, monkeypatch, capsys):
+    monkeypatch.setattr(mailer, "send_email", lambda message: False)  # e.g. Postmark refused it
+    csv_file = tmp_path / "people.csv"
+    csv_file.write_text("name,email,role\nAva Chen,ava.chen@waprep.org,student\n")
+    assert invite.main([str(csv_file)]) == 1
+    out = capsys.readouterr().out
+    assert "ava.chen@waprep.org (ava-chen)  EMAIL NOT SENT" in out
+    assert "1 invite email NOT sent" in out and "--resend" in out
+    db.expire_all()
+    assert db.query(Student).filter(Student.email == "ava.chen@waprep.org").one().status == "invited"  # account kept
+
+    assert invite.main(["--resend", "ava.chen@waprep.org"]) == 1
+    assert "was NOT sent" in capsys.readouterr().out
+
+    monkeypatch.setattr(mailer, "send_email", lambda message: True)
+    assert invite.main(["--resend", "ava.chen@waprep.org"]) == 0
+    assert "New activation link sent to ava.chen@waprep.org." in capsys.readouterr().out

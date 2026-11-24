@@ -158,8 +158,10 @@ def send_reset(person: Person, token: str) -> bool:
 
 # ------------------------------------------------------------------------------------------------ admin actions
 
-def invite(db: Session, name: str, email: str, role: str, grade: str = "", subject: str = "", group: str = "") -> Person:
-    """Creates an invited account and emails the activation link. RuleError when the email is taken or invalid."""
+def invite(db: Session, name: str, email: str, role: str, grade: str = "", subject: str = "",
+           group: str = "") -> Tuple[Person, bool]:
+    """Creates an invited account and emails the activation link. Returns the person and whether the email went out
+    (the account stays either way; --resend sends a new link). RuleError when the email is taken or invalid."""
     email = normalize_email(email)
     name = name.strip()
     if role not in _MODELS:
@@ -181,11 +183,11 @@ def invite(db: Session, name: str, email: str, role: str, grade: str = "", subje
     db.flush()
     token = create_link(db, role, person.id, ACTIVATE)
     db.commit()
-    send_invite(person, token)
-    return person
+    return person, send_invite(person, token)
 
 
-def resend_invite(db: Session, email: str) -> Person:
+def resend_invite(db: Session, email: str) -> Tuple[Person, bool]:
+    """A new activation link (the old one stops working). Returns the person and whether the email went out."""
     found = find_by_email(db, email)
     if not found:
         raise RuleError("not_found", "No account for %s." % normalize_email(email))
@@ -194,8 +196,7 @@ def resend_invite(db: Session, email: str) -> Person:
         raise RuleError("invalid", "%s is %s, not waiting for activation. Use forgot password instead." % (person.email, person.status))
     token = create_link(db, role, person.id, ACTIVATE)
     db.commit()
-    send_invite(person, token)
-    return person
+    return person, send_invite(person, token)
 
 
 def _cancel_upcoming_bookings(db: Session, person: Person, role: str) -> int:
