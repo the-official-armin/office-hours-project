@@ -11,6 +11,7 @@ interface Stored {
 }
 
 let memory: Stored | null = null
+let remembered = false
 
 function read(storage: () => Storage): Stored | null {
   try {
@@ -47,23 +48,37 @@ export function getToken(now = Date.now()): string | null {
 /** Remember a new token. `expiresInSeconds` comes from the login answer. */
 export function setToken(token: string, expiresInSeconds: number, remember: boolean, now = Date.now()): void {
   memory = { token, expiresAt: now + expiresInSeconds * 1000 }
+  remembered = remember
   write(() => sessionStorage, remember ? null : memory)
   write(() => localStorage, remember ? memory : null)
 }
 
 /** Read a token saved by an earlier visit (page reload, or "Keep me signed in"). Returns it, or null if none or expired. */
 export function loadStoredToken(now = Date.now()): string | null {
-  const found = read(() => localStorage) ?? read(() => sessionStorage)
+  const fromLocal = read(() => localStorage)
+  const found = fromLocal ?? read(() => sessionStorage)
   if (!found || found.expiresAt <= now) {
     clearToken()
     return null
   }
   memory = found
+  remembered = fromLocal !== null
   return found.token
+}
+
+/** Seconds until the current token runs out (0 when there is none). */
+export function secondsLeft(now = Date.now()): number {
+  return memory ? Math.max(0, (memory.expiresAt - now) / 1000) : 0
+}
+
+/** Whether the current token was saved with "Keep me signed in" (a refreshed token is kept the same way). */
+export function isRemembered(): boolean {
+  return remembered
 }
 
 export function clearToken(): void {
   memory = null
+  remembered = false
   write(() => sessionStorage, null)
   write(() => localStorage, null)
 }

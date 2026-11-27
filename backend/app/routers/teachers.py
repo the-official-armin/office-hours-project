@@ -1,5 +1,4 @@
 """Teacher directory, profile, settings, office-hour schedule and days off."""
-import re
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
@@ -38,12 +37,9 @@ def save_settings(body: TeacherSettingsIn, db: Session = Depends(get_db),
     name = body.name.strip()
     if not name:
         raise RuleError("invalid", "Enter a name first.")
-    email = body.email.strip()
-    if email and not re.match(r"^\S+@\S+\.\S+$", email):
-        raise RuleError("invalid", "Enter a valid email address.")
+    # The email is the sign-in, set when the person is invited: `email` in the body is ignored.
     teacher.name = name
     teacher.subject = body.subject.strip()
-    teacher.email = email
     teacher.remind = body.remind
     teacher.booking = body.booking
     teacher.cancel = body.cancel
@@ -89,7 +85,8 @@ def save_schedule(body: HoursInputIn, db: Session = Depends(get_db),
     for student_id, text in notices:
         student = db.get(Student, student_id)
         push_note(db, text, student_id=student_id,
-                  enabled=student.out if student is not None else True)
+                  enabled=student.out if student is not None else True,
+                  subject="%s changed their office hours" % teacher.name, link="/student/bookings", tag="out")
     db.commit()
     return {"orphaned": orphaned}
 
@@ -116,6 +113,9 @@ def add_day_off(body: DayOffIn, db: Session = Depends(get_db),
                 teacher.name, rules.format_date_long(body.date)),
             student_id=b.student_id,
             enabled=student.out if student is not None else True,
+            subject="%s is out on %s" % (teacher.name, rules.format_date_short(body.date)),
+            link="/student/bookings",
+            tag="out",
         )
     db.commit()
     return {"dayOff": {"date": body.date.isoformat(), "reason": reason}, "affected": len(affected)}
@@ -139,6 +139,9 @@ def remove_day_off(date: str, db: Session = Depends(get_db),
                 teacher.name, rules.format_date_long(d)),
             student_id=b.student_id,
             enabled=student.out if student is not None else True,
+            subject="%s is back on %s" % (teacher.name, rules.format_date_short(d)),
+            link="/student/bookings",
+            tag="out",
         )
     db.commit()
     return Response(status_code=204)

@@ -2,7 +2,7 @@
 import type { Note, StudentPrefs, TeacherPrefs } from '../../types'
 import type { Check, World } from '../../lib/rules'
 import { RuleError } from '../errors'
-import { MOCK_ACCOUNTS } from '../../auth/accounts'
+import { demoEmail, MOCK_ACCOUNTS } from '../../auth/accounts'
 import { defaultStudentPrefs, defaultTeacherPrefs, type DemoState } from './seed'
 import { nextId } from './store'
 
@@ -18,12 +18,12 @@ export function assertOk(c: Check): void {
 }
 
 /** A teacher's email switches. Someone who never saved settings has the defaults. */
-export const teacherPrefsOf = (d: DemoState, id: string): TeacherPrefs => d.teacherPrefs[id] ?? defaultTeacherPrefs()
+export const teacherPrefsOf = (d: DemoState, id: string): TeacherPrefs => d.teacherPrefs[id] ?? { ...defaultTeacherPrefs(), email: demoEmail(id) }
 
 /** A student's profile and email switches. Someone who never saved settings has the defaults (name from the example accounts). */
 export function studentPrefsOf(d: DemoState, id: string): StudentPrefs {
   const known = MOCK_ACCOUNTS.find((a) => a.id === id)
-  return d.studentPrefs[id] ?? defaultStudentPrefs(id, known?.name ?? id, known?.detail ?? '')
+  return d.studentPrefs[id] ?? { ...defaultStudentPrefs(id, known?.name ?? id, known?.detail ?? ''), email: demoEmail(id) }
 }
 
 /**

@@ -8,10 +8,10 @@ import { mockAuthApi, realAuthApi } from './authApi'
 import { authReducer, initialAuthState } from './authReducer'
 import { handleUnauthorized, setUnauthorizedHandler } from './events'
 import { guardMock } from './guardMock'
-import { AuthError, FIELD_ERRORS, FORGOT_NOTE, messageFor, MESSAGES, NO_ACCOUNT, pageIsFor, SESSION_ENDED, SIGNED_OUT } from './messages'
+import { AuthError, FIELD_ERRORS, messageFor, MESSAGES, NO_ACCOUNT, pageIsFor, SESSION_ENDED, SIGNED_OUT } from './messages'
 import { makeMockToken, parseMockToken } from './mockToken'
 import { clearToken, getToken, getTokenRaw, loadStoredToken, setToken } from './tokenStore'
-import { hasErrors, validateLogin } from './validate'
+import { hasErrors, validateLogin, validateNewPassword } from './validate'
 
 const maya = { id: 'maya', name: 'Maya K.', role: 'student' as const }
 const rivera = { id: 'rivera', name: 'Ms. Rivera', role: 'teacher' as const }
@@ -91,28 +91,35 @@ describe('?next= is only followed when it is safe', () => {
 })
 
 describe('error messages', () => {
-  it('has the exact words for each case, and never says which of ID or password was wrong', () => {
-    expect(MESSAGES.invalid).toBe('User ID or password is incorrect.')
+  it('has the exact words for each case, and never says which of email or password was wrong', () => {
+    expect(MESSAGES.invalid).toBe('Email or password is incorrect.')
     expect(MESSAGES.unauthorized).toBe('Your session ended. Sign in again.')
     expect(SESSION_ENDED).toBe('Your session ended. Sign in again.')
     expect(MESSAGES.too_many).toBe('Too many tries. Wait a few minutes and try again.')
     expect(MESSAGES.network).toBe('Can’t reach the server. Check your connection.')
-    expect(MESSAGES.invalid).not.toMatch(/^(User ID|Password) is/)
+    expect(MESSAGES.invalid).not.toMatch(/^(Email|Password) is/)
     expect(SIGNED_OUT).toBe('Signed out')
-    expect(FORGOT_NOTE).toBe('Ask the school office or IT to reset it.')
     expect(NO_ACCOUNT).toBe('No account? Your school sets it up for you.')
   })
   it('maps each kind of failure to its message, and anything unknown to the server one', () => {
-    for (const kind of ['invalid', 'unauthorized', 'too_many', 'network', 'server'] as const) {
+    for (const kind of ['invalid', 'unauthorized', 'too_many', 'network', 'server', 'link', 'weak_password'] as const) {
       expect(messageFor(new AuthError(kind))).toBe(MESSAGES[kind])
     }
     expect(messageFor(new Error('boom'))).toBe(MESSAGES.server)
   })
-  it('asks for an empty user ID or password inline, and nothing else', () => {
-    expect(validateLogin('', '')).toEqual({ userId: FIELD_ERRORS.userId, password: FIELD_ERRORS.password })
-    expect(validateLogin('   ', 'x')).toEqual({ userId: 'Enter your user ID.' })
-    expect(validateLogin('maya', '')).toEqual({ password: 'Enter your password.' })
-    expect(hasErrors(validateLogin('maya', 'x'))).toBe(false)
+  it('asks for an empty email or password inline, and nothing else', () => {
+    expect(validateLogin('', '')).toEqual({ email: FIELD_ERRORS.email, password: FIELD_ERRORS.password })
+    expect(validateLogin('   ', 'x')).toEqual({ email: 'Enter your email.' })
+    expect(validateLogin('maya@example.com', '')).toEqual({ password: 'Enter your password.' })
+    expect(hasErrors(validateLogin('maya@example.com', 'x'))).toBe(false)
+  })
+  it('checks a new password like the server: long enough, not the email, typed the same twice', () => {
+    const email = 'ava.chen@waprep.org'
+    expect(validateNewPassword('short', 'short', email)).toEqual({ password: FIELD_ERRORS.shortPassword })
+    expect(validateNewPassword('x'.repeat(129), 'x'.repeat(129), email)).toEqual({ password: FIELD_ERRORS.longPassword })
+    expect(validateNewPassword('Ava.Chen@waprep.org', 'Ava.Chen@waprep.org', email)).toEqual({ password: FIELD_ERRORS.emailPassword })
+    expect(validateNewPassword('a good long password', 'a good long passwort', email)).toEqual({ confirm: FIELD_ERRORS.confirm })
+    expect(validateNewPassword('a good long password', 'a good long password', email)).toEqual({})
   })
 })
 
@@ -140,14 +147,14 @@ describe('real login calls', () => {
 
   const answer = (status: number, body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status }))
 
-  it('posts role, userId and password and returns the token and the person', async () => {
+  it('posts email and password and returns the token and the person', async () => {
     const fetchMock = answer(200, { accessToken: 't', tokenType: 'bearer', expiresIn: 3600, user: maya })
     vi.stubGlobal('fetch', fetchMock)
-    const res = await realAuthApi.login('student', 'maya', 'demo-password')
+    const res = await realAuthApi.login('maya@example.com', 'demo-password')
     expect(res).toMatchObject({ accessToken: 't', expiresIn: 3600, user: maya })
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toMatch(/\/auth\/login$/)
-    expect(JSON.parse(String(init.body))).toEqual({ role: 'student', userId: 'maya', password: 'demo-password' })
+    expect(JSON.parse(String(init.body))).toEqual({ email: 'maya@example.com', password: 'demo-password' })
   })
   it('checks a saved token with GET /auth/me and the Bearer header', async () => {
     const fetchMock = answer(200, maya)
@@ -157,10 +164,29 @@ describe('real login calls', () => {
     expect(url).toMatch(/\/auth\/me$/)
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer t')
   })
+  it('reads an email link, chooses a password with it, and asks for a reset link', async () => {
+    const info = { purpose: 'activate', name: 'Ava Chen', email: 'ava@waprep.org', role: 'student' }
+    let fetchMock = answer(200, info)
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await realAuthApi.link('a/b')).toEqual(info)
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toMatch(/\/auth\/link\/a%2Fb$/)
+
+    fetchMock = answer(200, { accessToken: 't', tokenType: 'bearer', expiresIn: 3600, user: maya })
+    vi.stubGlobal('fetch', fetchMock)
+    await realAuthApi.setPassword('tok', 'a good long password')
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toMatch(/\/auth\/set-password$/)
+    expect(JSON.parse(String(init.body))).toEqual({ token: 'tok', password: 'a good long password' })
+
+    fetchMock = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(realAuthApi.forgotPassword('maya@example.com')).resolves.toBeUndefined()
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toMatch(/\/auth\/forgot-password$/)
+  })
   it('turns each answer into the right kind of failure', async () => {
     const kindOf = async (status: number, body: unknown) => {
       vi.stubGlobal('fetch', answer(status, body))
-      return realAuthApi.login('student', 'maya', 'x').then(
+      return realAuthApi.login('maya@example.com', 'x').then(
         () => 'ok',
         (e: AuthError) => e.kind,
       )
@@ -169,28 +195,35 @@ describe('real login calls', () => {
     expect(await kindOf(401, { code: 'unauthorized', message: '' })).toBe('unauthorized')
     expect(await kindOf(422, { detail: [] })).toBe('invalid')
     expect(await kindOf(429, {})).toBe('too_many')
+    expect(await kindOf(410, { code: 'link_invalid', message: '' })).toBe('link')
+    expect(await kindOf(422, { code: 'weak_password', message: '' })).toBe('weak_password')
     expect(await kindOf(500, {})).toBe('server')
   })
   it('says "can’t reach the server" when the request never arrives', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
-    await expect(realAuthApi.login('student', 'maya', 'x')).rejects.toMatchObject({ kind: 'network', message: MESSAGES.network })
+    await expect(realAuthApi.login('maya@example.com', 'x')).rejects.toMatchObject({ kind: 'network', message: MESSAGES.network })
   })
 })
 
 describe('mock accounts act like the real API', () => {
-  it('signs each example account in with the demo password, for its own role only', async () => {
+  it('signs each example account in with its email and the demo password', async () => {
     for (const a of MOCK_ACCOUNTS) {
-      const res = await mockAuthApi.login(a.role, a.id, MOCK_PASSWORD)
+      const res = await mockAuthApi.login(a.email.toUpperCase(), MOCK_PASSWORD)
       expect(res.user).toEqual({ id: a.id, role: a.role, name: a.name })
       expect(res.expiresIn).toBe(3600)
       expect(await mockAuthApi.me(res.accessToken)).toEqual(res.user)
     }
     expect(MOCK_ACCOUNTS.map((a) => a.id)).toEqual(expect.arrayContaining(['maya', 'daniel', 'rivera', 'okafor']))
   })
-  it('answers 401 invalid for a wrong password, an unknown ID, or the right ID on the wrong side', async () => {
-    await expect(mockAuthApi.login('student', 'maya', 'nope')).rejects.toMatchObject({ kind: 'invalid' })
-    await expect(mockAuthApi.login('student', 'nobody', MOCK_PASSWORD)).rejects.toMatchObject({ kind: 'invalid' })
-    await expect(mockAuthApi.login('teacher', 'maya', MOCK_PASSWORD)).rejects.toMatchObject({ kind: 'invalid' })
+  it('answers 401 invalid for a wrong password or an unknown email', async () => {
+    await expect(mockAuthApi.login('maya@example.com', 'nope')).rejects.toMatchObject({ kind: 'invalid' })
+    await expect(mockAuthApi.login('nobody@example.com', MOCK_PASSWORD)).rejects.toMatchObject({ kind: 'invalid' })
+    await expect(mockAuthApi.login('maya', MOCK_PASSWORD)).rejects.toMatchObject({ kind: 'invalid' })
+  })
+  it('has no email in mock mode, so every link is expired and forgot password just says it was sent', async () => {
+    await expect(mockAuthApi.link('t')).rejects.toMatchObject({ kind: 'link' })
+    await expect(mockAuthApi.setPassword('t', 'a good long password')).rejects.toMatchObject({ kind: 'link' })
+    await expect(mockAuthApi.forgotPassword('maya@example.com')).resolves.toBeUndefined()
   })
   it('rejects a token that is bad or has run out', async () => {
     await expect(mockAuthApi.me('garbage')).rejects.toMatchObject({ kind: 'unauthorized' })

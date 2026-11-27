@@ -161,6 +161,9 @@ export type RuleCode =
   | 'unauthorized'
   | 'forbidden'
   | 'invalid_credentials'
+  | 'link_invalid'
+  | 'weak_password'
+  | 'too_many'
 
 /** What the app shell (sidebar, top bar, tab bar) shows. */
 export interface ShellData {

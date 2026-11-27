@@ -1,5 +1,4 @@
 """Student profile settings."""
-import re
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -25,12 +24,9 @@ def save_settings(body: StudentSettingsIn, db: Session = Depends(get_db),
     name = body.name.strip()
     if not name:
         raise RuleError("invalid", "Enter a name first.")
-    email = body.email.strip()
-    if email and not re.match(r"^\S+@\S+\.\S+$", email):
-        raise RuleError("invalid", "Enter a valid email address.")
+    # The email is the sign-in, set when the person is invited: `email` in the body is ignored.
     student.name = name
     student.grade = body.grade.strip()
-    student.email = email
     student.remind = body.remind
     student.booked = body.booked
     student.answer = body.answer

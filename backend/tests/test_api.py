@@ -16,11 +16,15 @@ from app.models import Booking
 from app.seed import ME_STUDENT, fwd
 
 T0 = date.today()
-NEXT_TUE = fwd(T0, [2], 1)[0]
-NEXT_THU = fwd(T0, [4], 1)[0]
+# Ms. Rivera's (and Ms. Brooks's) office-hour days, the same list the seed books from (app/seed.py: riv, br), so the tests
+# hold on any weekday. A fixed "next Tuesday" / "next Thursday" broke on Tuesdays and Wednesdays, when the first upcoming
+# office-hour day is a Thursday.
+RIV = fwd(T0, [2, 4], 12)
+MAYA_DAY = RIV[0]  # Lunch: Maya, Daniel and Priya booked; Ms. Brooks's Lunch that day is full
+OPEN_DAY = RIV[1]  # Lunch: Hana and Leo booked, Maya free to book
+RIVR3 = RIV[3]  # seeded as a Rivera day off
 NEXT_FRI = fwd(T0, [5], 1)[0]
 NEXT_MON = fwd(T0, [1], 1)[0]
-RIVR3 = fwd(T0, [2, 4], 12)[3]  # a Rivera Thursday that is seeded as a day off
 REASON = "Need help with integrals and derivatives."
 
 
@@ -32,7 +36,7 @@ def test_healthz(client):
 
 def test_teacher_login_and_me(client):
     res = client.post("/auth/login", json={
-        "role": "teacher", "userId": "rivera", "password": "demo-password",
+        "email": "rivera@example.com", "password": "demo-password",
     })
     assert res.status_code == 200
     body = res.json()
@@ -45,7 +49,7 @@ def test_teacher_login_and_me(client):
 
 def test_second_demo_student_can_log_in(client):
     res = client.post("/auth/login", json={
-        "role": "student", "userId": "alex", "password": "demo-password",
+        "email": "alex@example.com", "password": "demo-password",
     })
     assert res.status_code == 200
     assert res.json()["user"]["name"] == "Alex R."
@@ -53,7 +57,7 @@ def test_second_demo_student_can_log_in(client):
 
 def test_login_rejects_bad_password(client):
     res = client.post("/auth/login", json={
-        "role": "student", "userId": "maya", "password": "wrong",
+        "email": "maya@example.com", "password": "wrong",
     })
     assert res.status_code == 401
     assert res.json()["code"] == "invalid_credentials"
@@ -153,7 +157,7 @@ def test_cannot_cancel_someone_elses_booking(student, signed_in):
 
 # ---------------------------------------------------------------- booking flow
 
-def _book(client, teacher="rivera", date=NEXT_TUE, timing="lunch", reason=REASON):
+def _book(client, teacher="rivera", date=MAYA_DAY, timing="lunch", reason=REASON):
     return client.post("/bookings", json={
         "teacherId": teacher, "date": date.isoformat(), "timingId": timing,
         "reason": reason,
@@ -161,8 +165,8 @@ def _book(client, teacher="rivera", date=NEXT_TUE, timing="lunch", reason=REASON
 
 
 def test_book_happy_path(student):
-    # Next Thursday's Lunch: two students booked, Maya holds nothing there.
-    res = _book(student, date=NEXT_THU)
+    # OPEN_DAY's Lunch: two students booked, Maya holds nothing there.
+    res = _book(student, date=OPEN_DAY)
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["status"] == "confirmed"
@@ -176,13 +180,13 @@ def test_book_happy_path(student):
 def test_booking_date_filter_is_inclusive(student):
     body = student.get(
         "/bookings",
-        params={"view": "student", "from": NEXT_TUE.isoformat(), "to": NEXT_TUE.isoformat()},
+        params={"view": "student", "from": MAYA_DAY.isoformat(), "to": MAYA_DAY.isoformat()},
     ).json()
     assert body
-    assert all(item["date"] == NEXT_TUE.isoformat() for item in body)
+    assert all(item["date"] == MAYA_DAY.isoformat() for item in body)
     assert student.get(
         "/bookings",
-        params={"view": "student", "from": NEXT_TUE.isoformat(), "to": (NEXT_TUE - timedelta(days=1)).isoformat()},
+        params={"view": "student", "from": MAYA_DAY.isoformat(), "to": (MAYA_DAY - timedelta(days=1)).isoformat()},
     ).json()["code"] == "invalid"
 
 
@@ -229,7 +233,7 @@ def test_book_bad_inputs(student):
 def test_cancel_booking_flow(student):
     mine = student.get("/bookings?view=student").json()
     upcoming = next(b for b in mine if b["teacherId"] == "rivera" and b["status"] == "confirmed"
-                    and b["date"] == NEXT_TUE.isoformat())
+                    and b["date"] == MAYA_DAY.isoformat())
     assert student.delete("/bookings/%s" % upcoming["id"]).status_code == 204
     # The spot is open again.
     assert _book(student).status_code == 200
@@ -248,7 +252,7 @@ def test_open_bookings_hide_other_students(student):
 
 
 def test_booking_notifies_teacher(student, teacher):
-    _book(student, date=NEXT_THU)
+    _book(student, date=OPEN_DAY)
     notes = teacher.get("/notifications?view=teacher").json()
     assert any("booked a spot in Lunch" in n["text"] for n in notes)
 
@@ -421,30 +425,28 @@ def test_send_request_rules(student):
 def test_teacher_settings_roundtrip(teacher):
     body = teacher.get("/teacher/settings").json()
     assert body["name"] == "Ms. Rivera"
-    body["email"] = "rivera@school.edu"
+    assert body["email"] == "rivera@example.com"
     body["morning"] = True
     res = teacher.put("/teacher/settings", json=body)
     assert res.status_code == 200
-    assert res.json()["email"] == "rivera@school.edu"
     assert teacher.get("/teacher/settings").json()["morning"] is True
 
 
-def test_settings_validation(teacher, student):
+def test_settings_cannot_change_the_sign_in_email(teacher, student):
+    # The email is the sign-in and comes from the invite; settings ignore it.
+    body = teacher.get("/teacher/settings").json()
+    body["email"] = "someone.else@waprep.org"
+    assert teacher.put("/teacher/settings", json=body).json()["email"] == "rivera@example.com"
+    sbody = student.get("/student/settings").json()
+    sbody["email"] = "nope"
+    assert student.put("/student/settings", json=sbody).json()["email"] == "maya@example.com"
+
+
+def test_settings_validation(teacher):
     bad = teacher.get("/teacher/settings").json()
     bad["name"] = "   "
     res = teacher.put("/teacher/settings", json=bad)
     assert res.status_code == 409
-    assert res.json()["code"] == "invalid"
-
-    bad["name"] = "Ms. Rivera"
-    bad["email"] = "not-an-email"
-    res = teacher.put("/teacher/settings", json=bad)
-    assert res.status_code == 409
-    assert res.json()["code"] == "invalid"
-
-    sbad = student.get("/student/settings").json()
-    sbad["email"] = "nope"
-    res = student.put("/student/settings", json=sbad)
     assert res.json()["code"] == "invalid"
 
 

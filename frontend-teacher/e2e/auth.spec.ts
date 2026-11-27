@@ -1,14 +1,14 @@
 // Sign-in, sign-out and route guards, end to end, in mock mode (example accounts, password "demo-password").
 import { expect, test, type Page } from '@playwright/test'
-import { PASSWORD, signIn } from './helpers'
+import { emailOf, PASSWORD, signIn } from './helpers'
 
-const userField = (page: Page) => page.getByLabel('User ID')
+const userField = (page: Page) => page.getByLabel('School email')
 const passwordField = (page: Page) => page.getByLabel('Password', { exact: true })
 const submit = (page: Page) => page.getByRole('button', { name: 'Sign in' })
 const logOut = (page: Page) => page.locator('#side').getByRole('button', { name: 'Log out' })
 
 async function fillAndSubmit(page: Page, id: string, password: string) {
-  await userField(page).fill(id)
+  await userField(page).fill(emailOf(id))
   await passwordField(page).fill(password)
   await submit(page).click()
 }
@@ -100,7 +100,7 @@ test.describe('signing in and out', () => {
 
   test('"Keep me signed in" decides where the token is kept', async ({ page }) => {
     await page.goto('/student/login')
-    await userField(page).fill('maya')
+    await userField(page).fill('maya@example.com')
     await passwordField(page).fill(PASSWORD)
     await submit(page).click()
     await expect(page).toHaveURL(/\/student$/)
@@ -108,7 +108,7 @@ test.describe('signing in and out', () => {
     await logOut(page).click()
 
     await page.goto('/student/login')
-    await userField(page).fill('maya')
+    await userField(page).fill('maya@example.com')
     await passwordField(page).fill(PASSWORD)
     await page.getByLabel('Keep me signed in').check()
     await submit(page).click()
@@ -118,39 +118,37 @@ test.describe('signing in and out', () => {
 })
 
 test.describe('errors', () => {
-  test('a wrong password shows one message, keeps the user ID, clears the password and refocuses it', async ({ page }) => {
+  test('a wrong password shows one message, keeps the email, clears the password and refocuses it', async ({ page }) => {
     await page.goto('/student/login')
     await fillAndSubmit(page, 'maya', 'not-the-password')
-    await expect(page.getByRole('alert')).toHaveText('User ID or password is incorrect.')
-    await expect(userField(page)).toHaveValue('maya')
+    await expect(page.getByRole('alert')).toHaveText('Email or password is incorrect.')
+    await expect(userField(page)).toHaveValue('maya@example.com')
     await expect(passwordField(page)).toHaveValue('')
     await expect(passwordField(page)).toBeFocused()
   })
 
-  test('an unknown ID, or an ID from the other side, gets the very same message', async ({ page }) => {
+  test('an unknown email gets the same message, and the account decides the side', async ({ page }) => {
     await page.goto('/student/login')
     await fillAndSubmit(page, 'nobody', PASSWORD)
-    await expect(page.getByRole('alert')).toHaveText('User ID or password is incorrect.')
-    await userField(page).fill('rivera') // a teacher's ID on the student page
-    await passwordField(page).fill(PASSWORD)
-    await submit(page).click()
-    await expect(page.getByRole('alert')).toHaveText('User ID or password is incorrect.')
+    await expect(page.getByRole('alert')).toHaveText('Email or password is incorrect.')
     await expect(page).toHaveURL(/\/student\/login$/)
+    await fillAndSubmit(page, 'rivera', PASSWORD) // a teacher's email on the student page
+    await expect(page).toHaveURL(/\/teacher$/)
   })
 
   test('empty fields: an inline error under each, aria-invalid and aria-describedby, focus on the first bad field', async ({ page }) => {
     await page.goto('/teacher/login')
     await submit(page).click()
-    await expect(page.getByText('Enter your user ID.')).toBeVisible()
+    await expect(page.getByText('Enter your email.')).toBeVisible()
     await expect(page.getByText('Enter your password.')).toBeVisible()
     await expect(userField(page)).toHaveAttribute('aria-invalid', 'true')
     await expect(userField(page)).toBeFocused()
     const described = await userField(page).getAttribute('aria-describedby')
-    await expect(page.locator(`[id="${described}"]`)).toHaveText('Enter your user ID.')
+    await expect(page.locator(`[id="${described}"]`)).toHaveText('Enter your email.')
 
-    await userField(page).fill('rivera')
+    await userField(page).fill('rivera@example.com')
     await submit(page).click()
-    await expect(page.getByText('Enter your user ID.')).toHaveCount(0)
+    await expect(page.getByText('Enter your email.')).toHaveCount(0)
     await expect(passwordField(page)).toHaveAttribute('aria-invalid', 'true')
     await expect(passwordField(page)).toBeFocused()
     expect(await passwordField(page).getAttribute('aria-describedby')).toBeTruthy()
@@ -158,7 +156,7 @@ test.describe('errors', () => {
 
   test('the Sign in button shows it is working and cannot be pressed twice', async ({ page }) => {
     await page.goto('/student/login')
-    await userField(page).fill('maya')
+    await userField(page).fill('maya@example.com')
     await passwordField(page).fill(PASSWORD)
     await submit(page).click()
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeDisabled()
@@ -166,12 +164,28 @@ test.describe('errors', () => {
     await expect(page).toHaveURL(/\/student$/)
   })
 
-  test('"Forgot password?" explains who to ask, inline', async ({ page }) => {
+  test('"Forgot password?" asks for the email and says a link was sent, without saying whether the account exists', async ({ page }) => {
     await page.goto('/student/login')
-    await expect(page.getByText('Ask the school office or IT to reset it.')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Forgot password?' }).click()
-    await expect(page.getByText('Ask the school office or IT to reset it.')).toBeVisible()
     await expect(page.getByText('No account? Your school sets it up for you.')).toBeVisible()
+    await page.getByRole('link', { name: 'Forgot password?' }).click()
+    await expect(page).toHaveURL(/\/forgot-password$/)
+    await page.getByRole('button', { name: 'Email me a link' }).click()
+    await expect(page.getByText('Enter your email.')).toBeVisible()
+    await page.getByLabel('School email').fill('nobody@example.com')
+    await page.getByRole('button', { name: 'Email me a link' }).click()
+    await expect(page.getByText(/^If that email has an account/)).toBeVisible()
+    await page.getByRole('link', { name: 'Back to sign in' }).click()
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
+  test('an email link that can’t be used says so and points to Forgot password', async ({ page }) => {
+    await page.goto('/activate?token=made-up')
+    await expect(page.getByRole('heading', { name: 'This link can’t be used' })).toBeVisible()
+    await expect(page.getByRole('alert')).toHaveText('This link has expired or was already used.')
+    // The token is taken out of the address bar.
+    await expect(page).toHaveURL(/\/activate$/)
+    await page.getByRole('link', { name: 'Forgot password' }).click()
+    await expect(page).toHaveURL(/\/forgot-password$/)
   })
 
   test('links to the other side’s sign in, and there is no sign-up', async ({ page }) => {
@@ -246,7 +260,7 @@ test.describe('keyboard and password managers', () => {
   test('you can sign in with the keyboard alone', async ({ page }) => {
     await page.goto('/student/login')
     await userField(page).focus()
-    await page.keyboard.type('maya')
+    await page.keyboard.type('maya@example.com')
     await page.keyboard.press('Tab')
     await expect(passwordField(page)).toBeFocused()
     await page.keyboard.type(PASSWORD)
@@ -285,7 +299,7 @@ test.describe('demo accounts (mock mode only)', () => {
     await expect(box.getByRole('button', { name: /Daniel O\./ })).toBeVisible()
     await expect(box.getByRole('button', { name: /Rivera/ })).toHaveCount(0)
     await box.getByRole('button', { name: /Daniel O\./ }).click()
-    await expect(userField(page)).toHaveValue('daniel')
+    await expect(userField(page)).toHaveValue('daniel@example.com')
     await expect(passwordField(page)).toHaveValue(PASSWORD)
     await submit(page).click()
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Daniel')

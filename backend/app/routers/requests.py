@@ -86,6 +86,9 @@ def send_request(body: SendRequestIn, db: Session = Depends(get_db),
             student.name, rules.format_date_short(r.date), rules.format_time(r.time)),
         teacher_id=teacher.id,
         enabled=teacher.request,
+        subject="New request from %s" % student.name,
+        link="/teacher/requests",
+        tag="request",
     )
     db.commit()
     db.refresh(r)
@@ -123,6 +126,9 @@ def answer_request(request_id: int, body: AnswerIn, db: Session = Depends(get_db
             rules.format_date_short(r.date), rules.format_time(r.time)),
         student_id=r.student_id,
         enabled=student.answer if student is not None else True,
+        subject="%s %s your request" % (teacher.name, "accepted" if accepted else "declined"),
+        link="/student/bookings",
+        tag="answer",
     )
     db.commit()
     return views.request_json(r)
@@ -148,6 +154,9 @@ def cancel_request(request_id: int, db: Session = Depends(get_db),
             "%s cancelled the request for %s." % (student.name, rules.format_date_short(r.date)),
             teacher_id=teacher.id,
             enabled=teacher.request,
+            subject="Request cancelled: %s" % student.name,
+            link="/teacher/requests",
+            tag="request",
         )
     db.commit()
     return Response(status_code=204)
